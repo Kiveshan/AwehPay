@@ -1,0 +1,13 @@
+{
+  "name": "awehpay-dev-runner",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backend": "npm --prefix backend start",
+    "flutter": "flutter run",
+    "dev": "concurrently -n backend,flutter -c cyan,green \"npm run backend\" \"npm run flutter\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

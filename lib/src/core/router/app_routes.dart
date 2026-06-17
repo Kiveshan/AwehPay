@@ -1,0 +1,35 @@
+abstract final class AppRoutes {
+  static const launch = '/launch';
+  static const home = '/';
+  static const adminSignIn = '/admin/sign-in';
+  static const adminHome = '/admin/home';
+  static const businessHome = '/business/home';
+  static const businessInsights = '/business/insights';
+  static const salesTracking = '/business/sales-tracking';
+  static const salesBreakdown = '/business/sales-tracking/breakdown';
+  static const businessList = '/admin/businesses';
+  static const businessDetails = '/admin/businesses/details';
+  static const businessBanking = '/admin/businesses/banking';
+  static const signUp = '/sign-up';
+  static const businessInformation = '/business-information';
+  static const subscriptionSelection = '/subscription-selection';
+  static const paymentInformation = '/payment-information';
+  static const accountCreated = '/account-created';
+  static const subscriptionTiers = '/admin/subscription-tiers';
+  static const editSubscriptionTier = '/admin/subscription-tiers/edit';
+  static const analytics = '/admin/analytics';
+  static const inventoryMenu = '/inventory/menu';
+  static const addProduct = '/inventory/add-product';
+  static const productList = '/inventory/products';
+  static const lowStockList = '/inventory/products/low-stock';
+  static const productDetails = '/inventory/products/details';
+  static const addService = '/inventory/add-service';
+  static const serviceList = '/inventory/services';
+  static const serviceDetails = '/inventory/services/details';
+  static const purchases = '/business/purchases';
+  static const purchasesQRCode = '/business/purchases/qr-code';
+  static const purchasesCashPayment = '/business/purchases/cash-payment';
+  static const purchasesPaymentConfirmed = '/business/purchases/payment-confirmed';
+  static const purchasesQRPaymentConfirmed = '/business/purchases/qr-payment-confirmed';
+  static const purchasesQRPaymentRejected = '/business/purchases/qr-payment-rejected';
+}
