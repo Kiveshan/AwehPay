@@ -7,12 +7,21 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/logout_button.dart';
 
-class BusinessHomeScreen extends StatelessWidget {
+typedef _HomeData = ({String businessName, DateTime? insightsUpdatedAt});
+
+class BusinessHomeScreen extends StatefulWidget {
   const BusinessHomeScreen({super.key});
 
-  Future<String> _fetchBusinessName() async {
+  @override
+  State<BusinessHomeScreen> createState() => _BusinessHomeScreenState();
+}
+
+class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
+  late final Future<_HomeData> _homeData = _fetchHomeData();
+
+  Future<_HomeData> _fetchHomeData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return 'Business';
+    if (user == null) return (businessName: 'Business', insightsUpdatedAt: null);
 
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -20,14 +29,53 @@ class BusinessHomeScreen extends StatelessWidget {
         .get();
 
     final businessId = userDoc.data()?['businessId'] as String?;
-    if (businessId == null || businessId.isEmpty) return 'Business';
+    if (businessId == null || businessId.isEmpty) {
+      return (businessName: 'Business', insightsUpdatedAt: null);
+    }
 
-    final businessDoc = await FirebaseFirestore.instance
-        .collection('businesses')
-        .doc(businessId)
-        .get();
+    final results = await Future.wait([
+      FirebaseFirestore.instance.collection('businesses').doc(businessId).get(),
+      FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(businessId)
+          .collection('salesSummaries')
+          .orderBy('updatedAt', descending: true)
+          .limit(1)
+          .get(),
+    ]);
 
-    return businessDoc.data()?['businessName'] as String? ?? 'Business';
+    final businessDoc = results[0] as DocumentSnapshot;
+    final summariesSnap = results[1] as QuerySnapshot;
+
+    final name = businessDoc.data() is Map
+        ? (businessDoc.data() as Map<String, dynamic>)['businessName'] as String? ?? 'Business'
+        : 'Business';
+
+    DateTime? insightsUpdatedAt;
+    if (summariesSnap.docs.isNotEmpty) {
+      final ts = summariesSnap.docs.first.data() is Map
+          ? (summariesSnap.docs.first.data() as Map<String, dynamic>)['updatedAt']
+          : null;
+      if (ts is Timestamp) insightsUpdatedAt = ts.toDate();
+    }
+
+    return (businessName: name, insightsUpdatedAt: insightsUpdatedAt);
+  }
+
+  String _formatRelativeTime(DateTime? dt) {
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return 'updated ${diff.inMinutes} min ago';
+    final pad = (int n) => n.toString().padLeft(2, '0');
+    final timeStr = '${pad(dt.hour)}:${pad(dt.minute)}';
+    final today = DateTime(now.year, now.month, now.day);
+    final dtDay = DateTime(dt.year, dt.month, dt.day);
+    if (dtDay == today) return 'updated today at $timeStr';
+    if (today.difference(dtDay).inDays == 1) return 'updated yesterday';
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return 'updated ${dt.day} ${months[dt.month]}';
   }
 
   @override
@@ -40,59 +88,65 @@ class BusinessHomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FutureBuilder<String>(
-                future: _fetchBusinessName(),
+              FutureBuilder<_HomeData>(
+                future: _homeData,
                 builder: (context, snapshot) {
-                  final name = snapshot.data ?? 'Business';
+                  final name = snapshot.data?.businessName ?? 'Business';
                   return _BusinessHeader(businessName: name);
                 },
               ),
               const SizedBox(height: 100),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const spacing = 16.0;
-                  final cardWidth = (constraints.maxWidth - spacing) / 2;
+              FutureBuilder<_HomeData>(
+                future: _homeData,
+                builder: (context, snapshot) {
+                  final insightsSubtitle = _formatRelativeTime(snapshot.data?.insightsUpdatedAt);
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      const spacing = 16.0;
+                      final cardWidth = (constraints.maxWidth - spacing) / 2;
 
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: [
-                      _BusinessTile(
-                        width: cardWidth,
-                        color: const Color(0xFFF4C4B7),
-                        iconWidget: SvgPicture.asset('assets/images/StockCartIcon.svg'),
-                        title: 'Inventory Management',
-                        iconSize: 65,
-                        onTap: () => context.push(AppRoutes.inventoryMenu),
-                      ),
-                      _BusinessTile(
-                        width: cardWidth,
-                        color: const Color(0xFFA9A5F4),
-                        iconWidget: SvgPicture.asset('assets/images/MoneyIcon.svg'),
-                        title: 'Purchases',
-                        iconSize: 65,
-                        onTap: () => context.push(AppRoutes.purchases),
-                      ),
-                      _BusinessTile(
-                        width: cardWidth,
-                        color: const Color(0xFF4F8DB7),
-                        iconWidget: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 58),
-                        title: 'Sales Tracking',
-                        subtitle: 'updated',
-                        iconSize: 58,
-                        iconContainerSize: 58,
-                        onTap: () => context.go(AppRoutes.salesTracking),
-                      ),
-                      _BusinessTile(
-                        width: cardWidth,
-                        color: const Color(0xFF8DE2DA),
-                        iconWidget: SvgPicture.asset('assets/images/GraphIcon.svg'),
-                        title: 'Business Insights',
-                        subtitle: 'updated 5 min ago',
-                        iconSize: 65,
-                        onTap: () => context.push(AppRoutes.businessInsights),
-                      ),
-                    ],
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: [
+                          _BusinessTile(
+                            width: cardWidth,
+                            color: const Color(0xFFF4C4B7),
+                            iconWidget: SvgPicture.asset('assets/images/StockCartIcon.svg'),
+                            title: 'Inventory Management',
+                            iconSize: 65,
+                            onTap: () => context.push(AppRoutes.inventoryMenu),
+                          ),
+                          _BusinessTile(
+                            width: cardWidth,
+                            color: const Color(0xFFA9A5F4),
+                            iconWidget: SvgPicture.asset('assets/images/MoneyIcon.svg'),
+                            title: 'Purchases',
+                            iconSize: 65,
+                            onTap: () => context.push(AppRoutes.purchases),
+                          ),
+                          _BusinessTile(
+                            width: cardWidth,
+                            color: const Color(0xFF4F8DB7),
+                            iconWidget: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 58),
+                            title: 'Sales Tracking',
+                            subtitle: 'updated',
+                            iconSize: 58,
+                            iconContainerSize: 58,
+                            onTap: () => context.go(AppRoutes.salesTracking),
+                          ),
+                          _BusinessTile(
+                            width: cardWidth,
+                            color: const Color(0xFF8DE2DA),
+                            iconWidget: SvgPicture.asset('assets/images/GraphIcon.svg'),
+                            title: 'Business Insights',
+                            subtitle: insightsSubtitle.isEmpty ? null : insightsSubtitle,
+                            iconSize: 65,
+                            onTap: () => context.push(AppRoutes.businessInsights),
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
