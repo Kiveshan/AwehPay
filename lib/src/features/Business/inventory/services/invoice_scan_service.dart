@@ -21,15 +21,19 @@ class InvoiceScanService {
     );
   }
 
-  Future<String> recognizeTextFromFilePath(String filePath) async {
+  Future<RecognizedText> recognizeFromFilePath(String filePath) async {
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final recognizedText = await recognizer.processImage(
+      return await recognizer.processImage(
         InputImage.fromFilePath(filePath),
       );
-      return recognizedText.text;
     } finally {
       recognizer.close();
     }
+  }
+
+  Future<String> recognizeTextFromFilePath(String filePath) async {
+    final result = await recognizeFromFilePath(filePath);
+    return result.text;
   }
 }

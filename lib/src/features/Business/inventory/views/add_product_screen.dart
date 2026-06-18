@@ -10,6 +10,7 @@ import '../../../../core/widgets/scan_barcode_button.dart';
 import '../../../../core/widgets/scan_type_bottom_sheet.dart';
 import '../../../../core/widgets/invoice_source_bottom_sheet.dart';
 
+import '../services/invoice_ocr_parser.dart';
 import '../services/invoice_scan_service.dart';
 import 'widgets/add_product_form.dart';
 
@@ -326,13 +327,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return;
       }
 
-      final rawOcrText = await _invoiceScanService.recognizeTextFromFilePath(
+      final recognizedText = await _invoiceScanService.recognizeFromFilePath(
         image.path,
       );
 
-      final response = await _apiService.matchScannedProductsFromRawText(
-        rawOcrText: rawOcrText,
+      final parser = InvoiceOcrParser();
+      final parsed = parser.parseRecognizedText(recognizedText);
+
+      if (parsed.products.isEmpty) {
+        _showError('No readable invoice items were found. Please retry scanning.');
+        return;
+      }
+
+      final response = await _apiService.matchScannedProducts(
+        products: parsed.products
+            .map((p) => p.toJson())
+            .toList(),
       );
+
       final rawProducts = response['products'];
       final matchedProducts = rawProducts is List
           ? rawProducts
@@ -351,9 +363,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         AppRoutes.reviewScannedProducts,
         extra: ReviewScannedProductsArgs(
           products: matchedProducts,
-          rawOcrText: rawOcrText,
-          supplierName: (response['supplierName'] as String?) ?? '',
-          invoiceNumber: (response['invoiceNumber'] as String?) ?? '',
+          rawOcrText: recognizedText.text,
+          supplierName: parsed.supplierName,
+          invoiceNumber: parsed.invoiceNumber,
         ),
       );
     } catch (error) {
