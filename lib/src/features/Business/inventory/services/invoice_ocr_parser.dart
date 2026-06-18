@@ -133,7 +133,7 @@ class InvoiceOcrParser {
     for (var i = 0; i < rows.length; i += 1) {
       final rowText = rows[i].text;
       final price = _extractLastMoneyValue(rowText);
-      if (price == null || _isSummaryRow(rowText)) {
+      if (price == null || _isSummaryRow(rowText) || _shouldIgnore(rowText)) {
         continue;
       }
 
@@ -168,23 +168,43 @@ class InvoiceOcrParser {
     return products;
   }
 
+  // Normalises an SA price string (e.g. "R 2 625,00") to a parseable double.
+  double? _parseSaPrice(String raw) {
+    // Remove currency symbol and leading/trailing space.
+    var s = raw.replaceAll(RegExp(r'^R\s*', caseSensitive: false), '').trim();
+    // If comma is the decimal separator (SA style: "2 625,00"), swap it to dot
+    // and strip the thousands space.
+    if (RegExp(r'\d,\d{2}$').hasMatch(s)) {
+      s = s.replaceAll(' ', '').replaceAll(',', '.');
+    } else {
+      // Otherwise treat comma as thousands separator ("2,625.00") – just drop it.
+      s = s.replaceAll(',', '').replaceAll(' ', '');
+    }
+    return double.tryParse(s);
+  }
+
   double? _extractLastMoneyValue(String text) {
+    // Match SA price: optional R, then digits with optional space-thousands
+    // separator, then a comma or dot followed by exactly 2 decimal digits.
     final matches = RegExp(
-      r'(?:R\s*)?(\d+(?:[\.,]\d{2}))',
+      r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
       caseSensitive: false,
-    ).allMatches(text.replaceAll(',', '.')).toList();
+    ).allMatches(text).toList();
 
     if (matches.isEmpty) {
       return null;
     }
 
-    return double.tryParse(matches.last.group(1)!);
+    return _parseSaPrice(matches.last.group(0)!);
   }
 
   String _removeMoneyValues(String text) {
     return text
         .replaceAll(
-          RegExp(r'(?:R\s*)?\d+(?:[\.,]\d{2})(?:\s*ZAR)?', caseSensitive: false),
+          RegExp(
+            r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}(?:\s*ZAR)?',
+            caseSensitive: false,
+          ),
           ' ',
         )
         .replaceAll(RegExp(r'\s+'), ' ')
@@ -217,10 +237,16 @@ class InvoiceOcrParser {
   bool _isSummaryRow(String text) {
     final value = text.toLowerCase();
     return value.contains('subtotal') ||
+        value.contains('sub total') ||
+        value.contains('sub tot') ||
         value.contains('taxes') ||
-        value == 'total' ||
-        value.startsWith('total ') ||
-        value.contains('order summary');
+        value.contains('total') ||
+        value.contains('order summary') ||
+        value.contains('banking') ||
+        value.contains('branch') ||
+        value.startsWith('vat') ||
+        value.contains(' vat ') ||
+        RegExp(r'\bvat\b').hasMatch(value);
   }
 
   ParsedInvoice parseInvoice(String rawText) {
@@ -436,7 +462,11 @@ class InvoiceOcrParser {
         value.contains('aerial cableway') ||
         value.contains('cableway co') ||
         value.contains('excl') ||
-        value.contains('incl');
+        value.contains('incl') ||
+        value.contains('banking') ||
+        value.contains('branch') ||
+        value.contains('sub total') ||
+        value.contains('sub tot');
   }
 
   ScannedProduct? _parseLine(String line) {
@@ -590,10 +620,13 @@ class InvoiceOcrParser {
     required double costPrice,
     required double confidence,
   }) {
-    final cleanedName = name
+    var cleanedName = name
         .replaceAll(RegExp(r'[^A-Za-z0-9\s\-_/]'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+
+    // Strip a leading line-number prefix (e.g. "1 MSMU4243999" → "MSMU4243999").
+    cleanedName = cleanedName.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
 
     if (cleanedName.isEmpty || quantity <= 0 || costPrice <= 0) {
       return null;
