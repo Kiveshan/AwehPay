@@ -65,9 +65,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Future<void> _loadProducts() async {
     try {
       final response = await _apiService.fetchProductList();
-      print('API response: $response');
       final raw = response['products'];
-      print('Products raw: $raw');
 
       if (!mounted) return;
 
@@ -91,7 +89,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
         });
       }
     } catch (error) {
-      print('Error loading products: $error');
       if (mounted) setState(() => _isLoading = false);
     }
   }

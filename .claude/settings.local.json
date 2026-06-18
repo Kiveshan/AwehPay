@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find lib/src/features/Business/inventory -type f)",
+      "Bash(dir /s /b lib\\\\src\\\\features\\\\Business\\\\inventory)",
+      "Bash(flutter devices *)",
+      "Bash(npm run *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

@@ -18,6 +18,9 @@ const createQrTransaction = require('./purchases/create_qr_transaction');
 const verifyPayment = require('./purchases/verify_payment');
 const paystackWebhook = require('./webhooks/paystack');
 const productListBackend = require('./inventory/product/product_list_backend');
+const barcodeScannerBackend = require('./inventory/product/barcode_scanner_backend');
+const reviewScannedProductsBackend = require('./inventory/product/review_scanned_products_backend');
+const productDetailsBackend = require('./inventory/product/product_details_backend');
 const fixedExpenseBackend = require('./business/business_insights/add_fixed_expense');
 const analyticsBackend = require('./business/business_insights/analytics');
 const addServiceBackend = require('./inventory/service/add_service_backend');
@@ -47,6 +50,9 @@ app.use('/subscription-tiers', subscriptionTierBackend);
 app.use('/business/sales', salesTrackingBackend);
 app.use('/business/sales', salesTrackingQueries);
 app.use('/inventory/product', productListBackend);
+app.use('/inventory/product', barcodeScannerBackend);
+app.use('/inventory/product', reviewScannedProductsBackend);
+app.use('/inventory/product', productDetailsBackend);
 app.use('/admin/businesses', adminBusinessBackend);
 app.use('/admin/analytics', adminAnalyticsBackend);
 
@@ -118,6 +124,6 @@ app.post('/test-user-profile', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`AwehPay backend running on port ${PORT}`);
 });

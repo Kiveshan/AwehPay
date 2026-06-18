@@ -23,6 +23,8 @@ import '../../features/system_admin/views/analytics_screen.dart';
 import '../../features/system_admin/views/system_admin_home_screen.dart';
 import '../../features/Business/Inventory/views/inventory_menu_screen.dart';
 import '../../features/Business/Inventory/views/add_product_screen.dart';
+import '../../features/Business/Inventory/views/barcode_scanner_screen.dart';
+import '../../features/Business/Inventory/views/review_scanned_products_screen.dart';
 import '../../features/Business/Inventory/views/add_service_screen.dart';
 import '../../features/Business/Inventory/views/product_details_screen.dart';
 import '../../features/Business/Inventory/views/product_list_screen.dart';
@@ -149,6 +151,19 @@ final appRouter = GoRouter(
           prefillLowStockThreshold:
               (extra['lowStockThreshold'] as num?)?.toInt(),
         );
+      },
+    ),
+    GoRoute(
+      path: AppRoutes.barcodeScanner,
+      builder: (context, state) => const BarcodeScannerScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.reviewScannedProducts,
+      builder: (context, state) {
+        final args = state.extra is ReviewScannedProductsArgs
+            ? state.extra! as ReviewScannedProductsArgs
+            : const ReviewScannedProductsArgs(products: [], rawOcrText: '');
+        return ReviewScannedProductsScreen(args: args);
       },
     ),
     GoRoute(

@@ -20,6 +20,25 @@ class ApiService {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> matchScannedProductsFromRawText({
+    required String rawOcrText,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('No Firebase user is signed in');
+    }
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/inventory/product/match-scanned-products-from-raw-text'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken, 'rawOcrText': rawOcrText}),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<Map<String, dynamic>> verifyCurrentUserToken() async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -189,6 +208,72 @@ class ApiService {
       _uri('/inventory/product/options'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'idToken': idToken}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  Future<Map<String, dynamic>> lookupProductByBarcode(String barcode) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('No Firebase user is signed in');
+    }
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/inventory/product/lookup-barcode'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken, 'barcode': barcode}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  Future<Map<String, dynamic>> matchScannedProducts({
+    required List<Map<String, dynamic>> products,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('No Firebase user is signed in');
+    }
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/inventory/product/match-scanned-products'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken, 'products': products}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  Future<Map<String, dynamic>> saveInvoiceScan({
+    required String rawOcrText,
+    required List<Map<String, dynamic>> products,
+    String supplierName = '',
+    String invoiceNumber = '',
+    String invoiceImageUrl = '',
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('No Firebase user is signed in');
+    }
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/inventory/product/save-invoice-scan'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'rawOcrText': rawOcrText,
+        'products': products,
+        'supplierName': supplierName,
+        'invoiceNumber': invoiceNumber,
+        'invoiceImageUrl': invoiceImageUrl,
+      }),
     );
 
     return _decodeResponse(response);

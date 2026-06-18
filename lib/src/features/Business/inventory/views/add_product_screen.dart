@@ -1,6 +1,17 @@
 import 'package:awe_pay/src/core/services/api_service.dart';
+import 'package:awe_pay/src/core/router/app_routes.dart';
+import 'package:awe_pay/src/features/Business/Inventory/models/scanned_product.dart';
+import 'package:awe_pay/src/features/Business/Inventory/views/review_scanned_products_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/widgets/add_product_header.dart';
+import '../../../../core/widgets/scan_barcode_button.dart';
+import '../../../../core/widgets/scan_type_bottom_sheet.dart';
+import '../../../../core/widgets/invoice_source_bottom_sheet.dart';
+
+import '../services/invoice_scan_service.dart';
+import 'widgets/add_product_form.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({
@@ -34,6 +45,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isProductAdded = false;
   bool _isSavingProduct = false;
   final _apiService = ApiService();
+  final _invoiceScanService = InvoiceScanService();
   late final TextEditingController _productNameController;
   late final TextEditingController _categoryController;
   late final TextEditingController _barcodeController;
@@ -133,8 +145,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isReplenish = widget.isReplenishStock;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -143,7 +153,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _Header(),
+              const AddProductHeader(),
               const SizedBox(height: 32),
               Expanded(
                 child: SingleChildScrollView(
@@ -152,197 +162,47 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     children: [
                       if (!_isProductAdded) ...[
                         Center(
-                          child: _ScanBarcodeButton(
-                            onTap: () {
-                              setState(() {
-                                _hasScannedBarcode = true;
-                              });
-                            },
+                          child: ScanBarcodeButton(
+                            onTap: _showScanOptions,
                           ),
                         ),
                         const SizedBox(height: 32),
                       ],
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: isReplenish
-                                ? const Color(0xFFF5C9B7)
-                                : const Color(0xFFF5C9B7),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_isProductAdded) ...[
-                              const _ProductAddedStatus(),
-                              const SizedBox(height: 24),
-                            ],
-                            _EditableOptionField(
-                              label: 'Product Name',
-                              controller: _productNameController,
-                              options: _productOptions,
-                              prefixIcon: Icons.search_rounded,
-                              readOnly: _isProductAdded ||
-                                  widget.lockedProductName != null,
-                              onOptionSelected: (name) {
-                                final data = _productDataByName[name];
-                                if (data != null) {
-                                  setState(() {
-                                    _selectedProductId =
-                                        data['productId'] as String?;
-                                    _productNameLockedBySelection = true;
-                                    _categoryController.text =
-                                        (data['category'] as String?) ?? '';
-                                    _costPriceController.text =
-                                        '${data['costPrice'] ?? ''}';
-                                    _sellingPriceController.text =
-                                        '${data['sellingPrice'] ?? ''}';
-                                    _quantityController.text =
-                                        '${data['stockQuantity'] ?? ''}';
-                                    _alertQuantityController.text =
-                                        '${data['lowStockThreshold'] ?? ''}';
-                                  });
-                                } else {
-                                  setState(() {
-                                    _selectedProductId = null;
-                                    _productNameLockedBySelection = false;
-                                  });
-                                }
-                              },
-                            ),
-                            if (_hasScannedBarcode) ...[
-                              const SizedBox(height: 18),
-                              _InputField(
-                                label: 'Product Barcode',
-                                controller: _barcodeController,
-                                readOnly: _isProductAdded,
-                              ),
-                            ],
-                            const SizedBox(height: 18),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _InputField(
-                                    label: 'Cost Price',
-                                    controller: _costPriceController,
-                                    keyboardType: TextInputType.number,
-                                    prefixText: 'R',
-                                    readOnly: _isProductAdded,
-                                  ),
-                                ),
-                                const SizedBox(width: 28),
-                                Expanded(
-                                  child: _InputField(
-                                    label: 'Selling Price',
-                                    controller: _sellingPriceController,
-                                    keyboardType: TextInputType.number,
-                                    prefixText: 'R',
-                                    readOnly: _isProductAdded,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 18),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _InputField(
-                                    label: 'Quantity',
-                                    labelColor: null,
-                                    borderColor: null,
-                                    textColor: null,
-                                    controller: _quantityController,
-                                    keyboardType: TextInputType.number,
-                                    spinnerColor: const Color(0xFFF5C9B7),
-                                    readOnly: _isProductAdded,
-                                    onIncrement: _isProductAdded
-                                        ? null
-                                        : () {
-                                            final v = int.tryParse(
-                                                  _quantityController.text,
-                                                ) ??
-                                                0;
-                                            setState(() {
-                                              _quantityController.text =
-                                                  '${v + 1}';
-                                            });
-                                          },
-                                    onDecrement: _isProductAdded
-                                        ? null
-                                        : () {
-                                            final v = int.tryParse(
-                                                  _quantityController.text,
-                                                ) ??
-                                                0;
-                                            if (v > 0) {
-                                              setState(() {
-                                                _quantityController.text =
-                                                    '${v - 1}';
-                                              });
-                                            }
-                                          },
-                                  ),
-                                ),
-                                const SizedBox(width: 28),
-                                Expanded(
-                                  child: _EditableOptionField(
-                                    label: 'Product Category',
-                                    controller: _categoryController,
-                                    options: _categoryOptions,
-                                    readOnly: _isProductAdded ||
-                                        widget.lockedCategory != null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            ...[
-                              const SizedBox(height: 18),
-                              _InputField(
-                                label: 'Alert me when stock reaches below',
-                                controller: _alertQuantityController,
-                                keyboardType: TextInputType.number,
-                                trailingText: 'Units',
-                                spinnerColor: const Color(0xFFF5C9B7),
-                                readOnly: _isProductAdded,
-                                onIncrement: _isProductAdded
-                                    ? null
-                                    : () {
-                                        final value = int.tryParse(
-                                              _alertQuantityController.text,
-                                            ) ??
-                                            0;
-                                        setState(() {
-                                          _alertQuantityController.text =
-                                              '${value + 1}';
-                                        });
-                                      },
-                                onDecrement: _isProductAdded
-                                    ? null
-                                    : () {
-                                        final value = int.tryParse(
-                                              _alertQuantityController.text,
-                                            ) ??
-                                            0;
-                                        if (value > 0) {
-                                          setState(() {
-                                            _alertQuantityController.text =
-                                                '${value - 1}';
-                                          });
-                                        }
-                                      },
-                              ),
-                            ],
-                            if (!_isProductAdded) ...[
-                              const SizedBox(height: 24),
-                              _SaveButton(
-                                label: 'Add Product',
-                                icon: Icons.add_rounded,
-                                onTap: _isSavingProduct ? null : _saveProduct,
-                              ),
-                            ],
-                          ],
-                        ),
+                      AddProductForm(
+                        isProductAdded: _isProductAdded,
+                        isSavingProduct: _isSavingProduct,
+                        hasScannedBarcode: _hasScannedBarcode,
+                        lockedProductName: widget.lockedProductName,
+                        lockedCategory: widget.lockedCategory,
+                        productOptions: _productOptions,
+                        categoryOptions: _categoryOptions,
+                        productNameController: _productNameController,
+                        categoryController: _categoryController,
+                        barcodeController: _barcodeController,
+                        costPriceController: _costPriceController,
+                        sellingPriceController: _sellingPriceController,
+                        quantityController: _quantityController,
+                        alertQuantityController: _alertQuantityController,
+                        onProductOptionSelected: (name) {
+                          final data = _productDataByName[name];
+                          if (data != null) {
+                            _fillFromProductMap(data, lockSelection: true);
+                          } else {
+                            setState(() {
+                              _selectedProductId = null;
+                              _productNameLockedBySelection = false;
+                            });
+                          }
+                        },
+                        onIncrementQuantity: () =>
+                            _changeIntField(_quantityController, 1),
+                        onDecrementQuantity: () =>
+                            _changeIntField(_quantityController, -1),
+                        onIncrementAlertQuantity: () =>
+                            _changeIntField(_alertQuantityController, 1),
+                        onDecrementAlertQuantity: () =>
+                            _changeIntField(_alertQuantityController, -1),
+                        onSave: _saveProduct,
                       ),
                     ],
                   ),
@@ -353,6 +213,194 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showScanOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return ScanTypeBottomSheet(
+          onScanBarcode: () {
+            Navigator.of(context).pop();
+            _handleBarcodeScan();
+          },
+          onScanInvoice: () {
+            Navigator.of(context).pop();
+            _handleInvoiceScan();
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _handleBarcodeScan() async {
+    final barcode = await context.push<String>(AppRoutes.barcodeScanner);
+    if (!mounted || barcode == null || barcode.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final response = await _apiService.lookupProductByBarcode(barcode.trim());
+      final product = response['product'];
+
+      if (response['found'] == true && product is Map<String, dynamic>) {
+        _applyProductPrefill(product);
+        _showError('Product found. Review details before saving.');
+      } else {
+        if (!mounted) return;
+        final addNew = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Product not found'),
+            content: const Text('Product not found. Add as new product?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Add New'),
+              ),
+            ],
+          ),
+        );
+
+        if (addNew == true && mounted) {
+          setState(() {
+            _selectedProductId = null;
+            _productNameLockedBySelection = false;
+            _hasScannedBarcode = true;
+            _barcodeController.text = barcode.trim();
+            _productNameController.clear();
+            _categoryController.clear();
+            _costPriceController.clear();
+            _sellingPriceController.clear();
+            _quantityController.clear();
+            _alertQuantityController.clear();
+          });
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        _showError(error.toString());
+      }
+    }
+  }
+
+  Future<void> _handleInvoiceScan() async {
+    final source = await showModalBottomSheet<InvoiceImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return InvoiceSourceBottomSheet(
+          onSelect: (choice) {
+            Navigator.of(context).pop(
+              choice == InvoiceSourceChoice.camera
+                  ? InvoiceImageSource.camera
+                  : InvoiceImageSource.gallery,
+            );
+          },
+        );
+      },
+    );
+
+    if (source == null) {
+      return;
+    }
+
+    setState(() {
+      _isSavingProduct = true;
+    });
+
+    try {
+      final image = await _invoiceScanService.pickInvoiceImage(source: source);
+      if (image == null) {
+        return;
+      }
+
+      final rawOcrText = await _invoiceScanService.recognizeTextFromFilePath(
+        image.path,
+      );
+
+      final response = await _apiService.matchScannedProductsFromRawText(
+        rawOcrText: rawOcrText,
+      );
+      final rawProducts = response['products'];
+      final matchedProducts = rawProducts is List
+          ? rawProducts
+              .whereType<Map<String, dynamic>>()
+              .map(ScannedProduct.fromJson)
+              .toList()
+          : <ScannedProduct>[];
+
+      if (matchedProducts.isEmpty) {
+        _showError('No readable invoice items were found. Please retry scanning.');
+        return;
+      }
+
+      if (!mounted) return;
+      await context.push(
+        AppRoutes.reviewScannedProducts,
+        extra: ReviewScannedProductsArgs(
+          products: matchedProducts,
+          rawOcrText: rawOcrText,
+          supplierName: (response['supplierName'] as String?) ?? '',
+          invoiceNumber: (response['invoiceNumber'] as String?) ?? '',
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _showError(error.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingProduct = false;
+        });
+      }
+    }
+  }
+
+  void _applyProductPrefill(Map<String, dynamic> product) {
+    _fillFromProductMap(product, lockSelection: true);
+  }
+
+  void _fillFromProductMap(
+    Map<String, dynamic> product, {
+    required bool lockSelection,
+  }) {
+    setState(() {
+      _selectedProductId = product['productId'] as String?;
+      _productNameLockedBySelection = lockSelection;
+      _hasScannedBarcode = true;
+      _productNameController.text = (product['name'] as String?) ?? '';
+      _categoryController.text = (product['category'] as String?) ?? '';
+      _barcodeController.text = (product['barcode'] as String?) ?? '';
+      _costPriceController.text = '${product['costPrice'] ?? ''}';
+      _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
+      _quantityController.text = '${product['stockQuantity'] ?? ''}';
+      _alertQuantityController.text = '${product['lowStockThreshold'] ?? ''}';
+    });
+  }
+
+  void _changeIntField(TextEditingController controller, int delta) {
+    final current = int.tryParse(controller.text.trim()) ?? 0;
+    final next = current + delta;
+    if (next < 0) {
+      return;
+    }
+
+    setState(() {
+      controller.text = '$next';
+    });
   }
 
   Future<void> _saveProduct() async {
@@ -472,414 +520,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
-    );
-  }
-}
-
-class _ProductAddedStatus extends StatelessWidget {
-  const _ProductAddedStatus();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        CircleAvatar(
-          radius: 28,
-          backgroundColor: Color(0xFFA8E6B0),
-          child: Icon(
-            Icons.check_rounded,
-            color: Colors.white,
-            size: 36,
-          ),
-        ),
-        SizedBox(height: 12),
-        Text(
-          'Product Added',
-          style: TextStyle(
-            color: Color(0xFFA8E6B0),
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Image.asset(
-          'assets/images/logo.png',
-          width: 48,
-          height: 48,
-          fit: BoxFit.contain,
-        ),
-        const Text(
-          'Add Product',
-          style: TextStyle(
-            color: Color(0xFF272A2F),
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            width: 58,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEEAB8),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InputField extends StatelessWidget {
-  const _InputField({
-    required this.label,
-    required this.controller,
-    this.labelColor,
-    this.borderColor,
-    this.textColor,
-    this.trailingText,
-    this.keyboardType,
-    this.spinnerColor,
-    this.onIncrement,
-    this.onDecrement,
-    this.prefixText,
-    this.readOnly = false,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final Color? labelColor;
-  final Color? borderColor;
-  final Color? textColor;
-  final String? trailingText;
-  final TextInputType? keyboardType;
-  final Color? spinnerColor;
-  final VoidCallback? onIncrement;
-  final VoidCallback? onDecrement;
-  final String? prefixText;
-  final bool readOnly;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor ?? const Color(0xFF6C7078),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: borderColor ?? const Color(0xFFC9CED6),
-            ),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            children: [
-              if (prefixText != null) ...[
-                const SizedBox(width: 12),
-                Text(
-                  prefixText!,
-                  style: const TextStyle(
-                    color: Color(0xFF272A2F),
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  keyboardType: keyboardType,
-                  readOnly: readOnly,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                    isDense: true,
-                  ),
-                  style: TextStyle(
-                    color: textColor ?? const Color(0xFF272A2F),
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              if (trailingText != null)
-                Text(
-                  trailingText!,
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 12,
-                  ),
-                ),
-              if (onIncrement != null || onDecrement != null) ...[
-                const SizedBox(width: 6),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: onIncrement,
-                      child: Icon(
-                        Icons.keyboard_arrow_up_rounded,
-                        color: spinnerColor ?? const Color(0xFF272A2F),
-                        size: 18,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: onDecrement,
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: spinnerColor ?? const Color(0xFF272A2F),
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EditableOptionField extends StatelessWidget {
-  const _EditableOptionField({
-    required this.label,
-    required this.controller,
-    required this.options,
-    this.prefixIcon,
-    this.readOnly = false,
-    this.onOptionSelected,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final List<String> options;
-  final IconData? prefixIcon;
-  final bool readOnly;
-  final ValueChanged<String>? onOptionSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final fieldWidth = MediaQuery.sizeOf(context).width - 76;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF6C7078),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        RawAutocomplete<String>(
-          textEditingController: controller,
-          focusNode: FocusNode(),
-          optionsBuilder: (textEditingValue) {
-            if (readOnly) {
-              return const Iterable<String>.empty();
-            }
-
-            final query = textEditingValue.text.toLowerCase().trim();
-
-            if (query.isEmpty) {
-              return options;
-            }
-
-            return options.where(
-              (option) => option.toLowerCase().contains(query),
-            );
-          },
-          fieldViewBuilder: (
-            context,
-            textEditingController,
-            focusNode,
-            onFieldSubmitted,
-          ) {
-            return Container(
-              height: 44,
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFC9CED6)),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  if (prefixIcon != null) ...[
-                    const SizedBox(width: 12),
-                    Icon(
-                      prefixIcon,
-                      color: const Color(0xFF272A2F),
-                      size: 20,
-                    ),
-                  ],
-                  Expanded(
-                    child: TextField(
-                      controller: textEditingController,
-                      focusNode: focusNode,
-                      readOnly: readOnly,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                        isDense: true,
-                      ),
-                      style: const TextStyle(
-                        color: Color(0xFF272A2F),
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF272A2F),
-                    size: 28,
-                  ),
-                  const SizedBox(width: 6),
-                ],
-              ),
-            );
-          },
-          optionsViewBuilder: (context, onSelected, options) {
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 4,
-                child: SizedBox(
-                  width: fieldWidth,
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options.elementAt(index);
-
-                      return ListTile(
-                        dense: true,
-                        title: Text(option),
-                        onTap: () {
-                          onSelected(option);
-                          onOptionSelected?.call(option);
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _ScanBarcodeButton extends StatelessWidget {
-  const _ScanBarcodeButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 210,
-        height: 42,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5C9B7),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.qr_code_scanner_rounded,
-              color: Colors.white,
-              size: 14,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Scan Barcode',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SaveButton extends StatelessWidget {
-  const _SaveButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 38,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5C9B7),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

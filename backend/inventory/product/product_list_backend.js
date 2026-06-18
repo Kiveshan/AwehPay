@@ -1,21 +1,11 @@
 const express = require('express');
 const admin = require('firebase-admin');
 
+const { resolveBusinessId } = require('../service/inventory_helpers');
+
 const router = express.Router();
 const db = admin.firestore();
 const auth = admin.auth();
-
-async function resolveBusinessId(idToken) {
-  const decodedToken = await auth.verifyIdToken(idToken);
-  const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-  const businessId = userDoc.data()?.businessId;
-
-  if (!businessId) {
-    throw new Error('No business is linked to this account');
-  }
-
-  return businessId;
-}
 
 router.post('/list', async (req, res) => {
   try {
@@ -25,7 +15,7 @@ router.post('/list', async (req, res) => {
       return res.status(400).json({ error: 'idToken is required' });
     }
 
-    const businessId = await resolveBusinessId(idToken);
+    const businessId = await resolveBusinessId({ auth, db, idToken });
 
     const snapshot = await db
       .collection('businesses')
@@ -77,7 +67,7 @@ router.post('/update-product', async (req, res) => {
       });
     }
 
-    const businessId = await resolveBusinessId(idToken);
+    const businessId = await resolveBusinessId({ auth, db, idToken });
     const productRef = db
       .collection('businesses')
       .doc(businessId)

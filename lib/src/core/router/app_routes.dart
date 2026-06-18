@@ -20,6 +20,8 @@ abstract final class AppRoutes {
   static const analytics = '/admin/analytics';
   static const inventoryMenu = '/inventory/menu';
   static const addProduct = '/inventory/add-product';
+  static const barcodeScanner = '/inventory/scan-barcode';
+  static const reviewScannedProducts = '/inventory/review-scanned-products';
   static const productList = '/inventory/products';
   static const lowStockList = '/inventory/products/low-stock';
   static const productDetails = '/inventory/products/details';

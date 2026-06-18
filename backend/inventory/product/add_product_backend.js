@@ -1,6 +1,10 @@
 const express = require('express');
 const admin = require('firebase-admin');
 
+const {
+  normalizeName,
+} = require('../service/inventory_helpers');
+
 const router = express.Router();
 const db = admin.firestore();
 const auth = admin.auth();
@@ -112,6 +116,7 @@ router.post('/add-product', async (req, res) => {
         productId: productRef.id,
         businessId,
         name: name.trim(),
+        nameLower: normalizeName(name),
         barcode: typeof barcode === 'string' ? barcode.trim() : '',
         costPrice,
         sellingPrice,
@@ -124,6 +129,7 @@ router.post('/add-product', async (req, res) => {
         imageUrl: '',
         isActive: true,
         isDeleted: false,
+        source: 'manual',
         createdAt: now,
         updatedAt: now,
       });
