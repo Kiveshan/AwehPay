@@ -17,7 +17,7 @@ class QRPaymentConfirmedScreen extends StatelessWidget {
   final List<PurchaseItem> items;
   final double totalAmount;
 
-  double get _tax => totalAmount * 0.10;
+  double get _tax => totalAmount * 0.15;
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +122,7 @@ class QRPaymentConfirmedScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         SummaryRow(
-                          label: 'Tax (10%)',
+                          label: 'Tax (15%)',
                           value: 'R${_tax.toStringAsFixed(2)}',
                           bold: true,
                         ),

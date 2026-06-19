@@ -19,7 +19,7 @@ class QRPaymentRejectedScreen extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onChangeMethod;
 
-  double get _tax => totalAmount * 0.10;
+  double get _tax => totalAmount * 0.15;
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +157,7 @@ class QRPaymentRejectedScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SummaryRow(
-            label: 'Tax (10%)',
+            label: 'Tax (15%)',
             value: 'R${_tax.toStringAsFixed(2)}',
             bold: true,
           ),

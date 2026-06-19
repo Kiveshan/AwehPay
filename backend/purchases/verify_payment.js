@@ -15,7 +15,18 @@ router.get('/verify-payment/:reference', async (req, res) => {
     const { reference } = req.params;
     if (!reference) return res.status(400).json({ error: 'Reference is required' });
 
-    await auth.verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const businessId = userDoc.data()?.businessId;
+    if (!businessId) return res.status(400).json({ error: 'No business linked to this account' });
+
+    // The transaction doc ID is set to the Paystack reference at creation time
+    // (see create_qr_transaction.js), so this is a direct lookup — no index needed.
+    const transactionRef = db
+      .collection('businesses')
+      .doc(businessId)
+      .collection('transactions')
+      .doc(reference);
 
     const verifyResponse = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
@@ -28,44 +39,20 @@ router.get('/verify-payment/:reference', async (req, res) => {
     const status = txData?.status;
 
     if (status === 'success') {
-      // Find the transaction in Firestore and mark as completed
-      const userDoc = await db
-        .collection('users')
-        .where('email', '==', txData.customer?.email)
-        .limit(1)
-        .get();
-
-      // Try to update via collectionGroup query
-      const snapshot = await db
-        .collectionGroup('transactions')
-        .where('paystackReference', '==', reference)
-        .limit(1)
-        .get();
-
-      if (!snapshot.empty) {
-        await snapshot.docs[0].ref.update({
-          status: 'completed',
-          amountCollected: txData.amount / 100,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
+      await transactionRef.update({
+        status: 'completed',
+        amountCollected: txData.amount / 100,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
       return res.json({ success: true, status: 'completed' });
     }
 
     if (status === 'failed' || status === 'reversed') {
-      const snapshot = await db
-        .collectionGroup('transactions')
-        .where('paystackReference', '==', reference)
-        .limit(1)
-        .get();
-
-      if (!snapshot.empty) {
-        await snapshot.docs[0].ref.update({
-          status: 'failed',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
+      await transactionRef.update({
+        status: 'failed',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
       return res.json({ success: true, status: 'failed' });
     }

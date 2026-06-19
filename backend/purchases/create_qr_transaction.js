@@ -30,7 +30,15 @@ router.post('/qr-transaction', async (req, res) => {
     if (!businessId) return res.status(400).json({ error: 'No business linked to this account' });
 
     const businessDoc = await db.collection('businesses').doc(businessId).get();
-    const businessEmail = customerEmail || businessDoc.data()?.email || userData?.email;
+    const businessData = businessDoc.data();
+    const businessEmail = customerEmail || businessData?.email || userData?.email;
+    const subaccountCode = businessData?.paystackSubaccountCode;
+
+    if (!subaccountCode) {
+      return res.status(400).json({
+        error: 'This business has no linked payout account yet. Complete payment setup before accepting payments.',
+      });
+    }
 
     // Paystack amount must be in cents (multiply by 100)
     const amountInCents = Math.round(amountTotal * 100);
@@ -42,6 +50,8 @@ router.post('/qr-transaction', async (req, res) => {
         amount: amountInCents,
         currency: 'ZAR',
         qr: { provider: 'scan-to-pay' },
+        subaccount: subaccountCode,
+        bearer: 'subaccount',
       },
       {
         headers: {
