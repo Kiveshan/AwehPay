@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:awe_pay/src/core/services/api_service.dart';
 import 'package:awe_pay/src/core/router/app_routes.dart';
 import 'package:awe_pay/src/features/Business/Inventory/models/scanned_product.dart';
@@ -45,6 +47,7 @@ class AddProductScreen extends StatefulWidget {
 class _AddProductScreenState extends State<AddProductScreen> {
   bool _isProductAdded = false;
   bool _isSavingProduct = false;
+  bool _isProcessingInvoice = false;
   final _apiService = ApiService();
   final _invoiceScanService = InvoiceScanService();
   late final TextEditingController _productNameController;
@@ -148,70 +151,81 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AddProductHeader(),
-              const SizedBox(height: 32),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (!_isProductAdded) ...[
-                        Center(
-                          child: ScanBarcodeButton(
-                            onTap: _showScanOptions,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AddProductHeader(),
+                  const SizedBox(height: 32),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!_isProductAdded) ...[
+                            Center(
+                              child: ScanBarcodeButton(
+                                onTap: _showScanOptions,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                          ],
+                          AddProductForm(
+                            isProductAdded: _isProductAdded,
+                            isSavingProduct: _isSavingProduct,
+                            hasScannedBarcode: _hasScannedBarcode,
+                            lockedProductName: widget.lockedProductName,
+                            lockedCategory: widget.lockedCategory,
+                            productOptions: _productOptions,
+                            categoryOptions: _categoryOptions,
+                            productNameController: _productNameController,
+                            categoryController: _categoryController,
+                            barcodeController: _barcodeController,
+                            costPriceController: _costPriceController,
+                            sellingPriceController: _sellingPriceController,
+                            quantityController: _quantityController,
+                            alertQuantityController: _alertQuantityController,
+                            onProductOptionSelected: (name) {
+                              final data = _productDataByName[name];
+                              if (data != null) {
+                                _fillFromProductMap(data, lockSelection: true);
+                              } else {
+                                setState(() {
+                                  _selectedProductId = null;
+                                  _productNameLockedBySelection = false;
+                                });
+                              }
+                            },
+                            onIncrementQuantity: () =>
+                                _changeIntField(_quantityController, 1),
+                            onDecrementQuantity: () =>
+                                _changeIntField(_quantityController, -1),
+                            onIncrementAlertQuantity: () =>
+                                _changeIntField(_alertQuantityController, 1),
+                            onDecrementAlertQuantity: () =>
+                                _changeIntField(_alertQuantityController, -1),
+                            onSave: _saveProduct,
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                      AddProductForm(
-                        isProductAdded: _isProductAdded,
-                        isSavingProduct: _isSavingProduct,
-                        hasScannedBarcode: _hasScannedBarcode,
-                        lockedProductName: widget.lockedProductName,
-                        lockedCategory: widget.lockedCategory,
-                        productOptions: _productOptions,
-                        categoryOptions: _categoryOptions,
-                        productNameController: _productNameController,
-                        categoryController: _categoryController,
-                        barcodeController: _barcodeController,
-                        costPriceController: _costPriceController,
-                        sellingPriceController: _sellingPriceController,
-                        quantityController: _quantityController,
-                        alertQuantityController: _alertQuantityController,
-                        onProductOptionSelected: (name) {
-                          final data = _productDataByName[name];
-                          if (data != null) {
-                            _fillFromProductMap(data, lockSelection: true);
-                          } else {
-                            setState(() {
-                              _selectedProductId = null;
-                              _productNameLockedBySelection = false;
-                            });
-                          }
-                        },
-                        onIncrementQuantity: () =>
-                            _changeIntField(_quantityController, 1),
-                        onDecrementQuantity: () =>
-                            _changeIntField(_quantityController, -1),
-                        onIncrementAlertQuantity: () =>
-                            _changeIntField(_alertQuantityController, 1),
-                        onDecrementAlertQuantity: () =>
-                            _changeIntField(_alertQuantityController, -1),
-                        onSave: _saveProduct,
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          if (_isProcessingInvoice)
+            Container(
+              color: Colors.white,
+              child: const Center(
+                child: _ProcessingInvoiceOverlay(),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -319,6 +333,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     setState(() {
       _isSavingProduct = true;
+      _isProcessingInvoice = true;
     });
 
     try {
@@ -376,6 +391,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (mounted) {
         setState(() {
           _isSavingProduct = false;
+          _isProcessingInvoice = false;
         });
       }
     }
@@ -534,4 +550,97 @@ class _AddProductScreenState extends State<AddProductScreen> {
       SnackBar(content: Text(message)),
     );
   }
+}
+
+class _ProcessingInvoiceOverlay extends StatefulWidget {
+  const _ProcessingInvoiceOverlay();
+
+  @override
+  State<_ProcessingInvoiceOverlay> createState() =>
+      _ProcessingInvoiceOverlayState();
+}
+
+class _ProcessingInvoiceOverlayState extends State<_ProcessingInvoiceOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 72,
+          height: 72,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: _DotCirclePainter(progress: _controller.value),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Processing Invoice',
+          style: TextStyle(
+            color: Color(0xFF272A2F),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DotCirclePainter extends CustomPainter {
+  const _DotCirclePainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dotCount = 12;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 6;
+    const dotRadius = 4.0;
+
+    for (int i = 0; i < dotCount; i++) {
+      final angle = (i / dotCount) * 2 * math.pi;
+      final offset = Offset(
+        center.dx + radius * math.cos(angle - math.pi / 2),
+        center.dy + radius * math.sin(angle - math.pi / 2),
+      );
+      final distFromActive = ((i / dotCount) - progress + 1) % 1;
+      final opacity = (1 - distFromActive).clamp(0.15, 1.0);
+      canvas.drawCircle(
+        offset,
+        dotRadius,
+        Paint()
+          ..color =
+              const Color(0xFFB8A9E8).withValues(alpha: opacity),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotCirclePainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
