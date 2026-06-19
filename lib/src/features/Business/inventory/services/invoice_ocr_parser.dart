@@ -614,6 +614,19 @@ class InvoiceOcrParser {
         !lower.contains('invoice');
   }
 
+  /// Returns true when a name is clearly OCR garbage — e.g. the price column
+  /// read sideways produces names like "R R R R R R R1 R12 6M SHIPMENT 08"
+  /// where the majority of tokens are currency/number fragments.
+  bool _isGarbageName(String name) {
+    final words = name.split(RegExp(r'\s+'));
+    if (words.isEmpty) return true;
+    final junkCount = words.where((w) {
+      return RegExp(r'^R\d*$', caseSensitive: false).hasMatch(w) ||
+          RegExp(r'^\d+$').hasMatch(w);
+    }).length;
+    return junkCount / words.length > 0.55;
+  }
+
   ScannedProduct? _buildProduct({
     required String name,
     required int quantity,
@@ -628,7 +641,19 @@ class InvoiceOcrParser {
     // Strip a leading line-number prefix (e.g. "1 MSMU4243999" → "MSMU4243999").
     cleanedName = cleanedName.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
 
+    // Remove leftover standalone currency prefix "R" tokens (e.g. "R POLYFIBRO" → "POLYFIBRO").
+    cleanedName = cleanedName
+        .replaceAll(RegExp(r'\bR\b\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
     if (cleanedName.isEmpty || quantity <= 0 || costPrice <= 0) {
+      return null;
+    }
+
+    // Reject names that are clearly OCR garbage from a rotated price column —
+    // e.g. "R R R R R R R1 R12" where most tokens are currency fragments.
+    if (_isGarbageName(cleanedName)) {
       return null;
     }
 
