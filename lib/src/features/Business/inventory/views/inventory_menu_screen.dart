@@ -30,7 +30,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
         final count = raw.whereType<Map<String, dynamic>>().where((p) {
           final qty = ((p['stockQuantity'] as num?) ?? 0).toInt();
           final threshold = ((p['lowStockThreshold'] as num?) ?? 0).toInt();
-          return qty < threshold;
+          return qty <= threshold;
         }).length;
         if (mounted) setState(() => _lowStockCount = count);
       }

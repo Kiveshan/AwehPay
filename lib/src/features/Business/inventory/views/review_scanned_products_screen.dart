@@ -41,6 +41,22 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
     _products = widget.args.products.map(_EditableScannedProduct.new).toList();
   }
 
+  void _addBlankProduct() {
+    setState(() {
+      _products.add(
+        _EditableScannedProduct(
+          const ScannedProduct(
+            name: '',
+            quantity: 1,
+            costPrice: 0,
+            category: 'Other',
+            confidence: 1,
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   void dispose() {
     for (final product in _products) {
@@ -144,22 +160,44 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: _isSaving ? null : () => context.pop(false),
-                    child: Container(
-                      width: 58,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEEAB8),
-                        borderRadius: BorderRadius.circular(18),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _isSaving ? null : _addBlankProduct,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5C9B7),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 28,
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _isSaving ? null : () => context.pop(false),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEEAB8),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -167,7 +205,7 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
               const Text(
                 'Confirm each item before saving. Existing products fill selling price and low stock automatically when matched.',
                 style: TextStyle(
-                  color: Color(0xFF6C7078),
+                  color: Color(0xFF272A2F),
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -286,7 +324,7 @@ class _ScannedProductCard extends StatelessWidget {
                 child: Text(
                   product.original.isExistingProduct ? 'Existing product' : 'New product',
                   style: const TextStyle(
-                    color: Color(0xFF6C7078),
+                    color: Color(0xFF272A2F),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -294,7 +332,7 @@ class _ScannedProductCard extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF6C7078)),
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF272A2F)),
               ),
             ],
           ),
@@ -344,7 +382,7 @@ class _TextInput extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Color(0xFF6C7078),
+            color: Color(0xFF272A2F),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -360,12 +398,17 @@ class _TextInput extends StatelessWidget {
             children: [
               if (prefixText != null) ...[
                 const SizedBox(width: 10),
-                Text(prefixText!, style: const TextStyle(color: Color(0xFF272A2F))),
+                Text(prefixText!, style: const TextStyle(color: Color(0xFF272A2F), fontWeight: FontWeight.w600)),
               ],
               Expanded(
                 child: TextField(
                   controller: controller,
                   keyboardType: keyboardType,
+                  style: const TextStyle(
+                    color: Color(0xFF272A2F),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 10),

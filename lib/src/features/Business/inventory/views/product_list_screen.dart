@@ -611,7 +611,7 @@ class _ProductItem {
   final int lowStockThreshold;
   final String category;
 
-  bool get isLowStock => stockQuantity < lowStockThreshold;
+  bool get isLowStock => stockQuantity <= lowStockThreshold;
 
   static _ProductItem fromMap(Map<String, dynamic> map) {
     return _ProductItem(

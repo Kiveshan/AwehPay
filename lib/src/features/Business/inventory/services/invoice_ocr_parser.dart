@@ -92,36 +92,31 @@ class InvoiceOcrParser {
       for (final line in block.lines) {
         final box = line.boundingBox;
         final text = line.text.trim();
-        if (text.isEmpty) {
-          continue;
-        }
-
-        ocrLines.add(
-          _OcrTextLine(
-            text: text,
-            left: box.left,
-            right: box.right,
-            top: box.top,
-            bottom: box.bottom,
-          ),
-        );
+        if (text.isEmpty) continue;
+        ocrLines.add(_OcrTextLine(
+          text: text,
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        ));
       }
     }
 
-    if (ocrLines.isEmpty) {
-      return [];
-    }
+    if (ocrLines.isEmpty) return [];
 
     ocrLines.sort((a, b) => a.centerY.compareTo(b.centerY));
+
+    // Group OCR lines into visual rows. Max tolerance 50px covers moderate
+    // page tilt where price (right edge) lands at a different Y than the name.
     final rows = <_OcrVisualRow>[];
     for (final line in ocrLines) {
       if (rows.isEmpty) {
         rows.add(_OcrVisualRow([line]));
         continue;
       }
-
       final previous = rows.last;
-      final tolerance = (line.height * 0.8).clamp(12, 34).toDouble();
+      final tolerance = (line.height * 0.9).clamp(12.0, 50.0);
       if ((line.centerY - previous.centerY).abs() <= tolerance) {
         previous.lines.add(line);
       } else {
@@ -130,26 +125,72 @@ class InvoiceOcrParser {
     }
 
     final products = <ScannedProduct>[];
-    for (var i = 0; i < rows.length; i += 1) {
+    final consumed = <int>{};
+
+    for (var i = 0; i < rows.length; i++) {
+      if (consumed.contains(i)) continue;
+
       final rowText = rows[i].text;
-      final price = _extractLastMoneyValue(rowText);
-      if (price == null || _isSummaryRow(rowText)) {
-        continue;
+      if (_isSummaryRow(rowText)) continue;
+
+      // Collect ALL money values in the row — needed for table-format detection.
+      var allPrices = _extractAllMoneyValues(rowText);
+
+      // Orphan recovery pass A: no price here, check if next row is price-only.
+      if (allPrices.isEmpty && i + 1 < rows.length && !consumed.contains(i + 1)) {
+        final nextText = rows[i + 1].text;
+        if (!_isSummaryRow(nextText)) {
+          final nextPrices = _extractAllMoneyValues(nextText);
+          final nextResidue = _removeMoneyValues(nextText).trim();
+          if (nextPrices.isNotEmpty && nextResidue.isEmpty) {
+            allPrices = nextPrices;
+            consumed.add(i + 1);
+          }
+        }
       }
 
-      var name = _removeMoneyValues(rowText);
-      var quantity = _extractQuantity(name);
+      if (allPrices.isEmpty) continue;
+
+      // Always use the LAST money value as the cost price (line total on
+      // structured invoices) and read the qty directly from the row text —
+      // no calculations or math validation.
+      final namePortion = _removeMoneyValues(rowText);
+      final price = allPrices.last;
+      final tableQty = _extractTableQuantity(namePortion);
+
+      // Apply ignore checks only to the name portion (not full row text) to
+      // avoid rejecting products whose reference column has stray keywords.
+      if (_shouldIgnoreInVisualRow(namePortion)) continue;
+
+      var name = namePortion;
+
+      // Remove the extracted table qty number from the name so it doesn't
+      // pollute the product name field.
+      if (tableQty != null) {
+        name = name
+            .replaceFirst(
+              RegExp('(?<![A-Za-z0-9\\-/])$tableQty(?![A-Za-z.,/\\-])'),
+              ' ',
+            )
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+      }
+
+      // x-pattern quantity (e.g. "3x" / "x 3") overrides table qty.
+      var quantity = _extractQuantity(name) ?? tableQty;
       name = _removeQuantityText(name);
 
-      for (var offset = 1; offset <= 2 && i + offset < rows.length; offset += 1) {
+      // Extend name with detail text from subsequent no-price rows.
+      for (var offset = 1; offset <= 2 && i + offset < rows.length; offset++) {
+        if (consumed.contains(i + offset)) break;
         final detailText = rows[i + offset].text;
-        if (_extractLastMoneyValue(detailText) != null || _isSummaryRow(detailText)) {
+        if (_extractAllMoneyValues(detailText).isNotEmpty || _isSummaryRow(detailText)) {
           break;
         }
-
         quantity ??= _extractQuantity(detailText);
         final cleanedDetail = _removeQuantityText(detailText);
-        if (_looksLikeProductName(cleanedDetail) && !name.toLowerCase().contains(cleanedDetail.toLowerCase())) {
+        if (_looksLikeProductName(cleanedDetail) &&
+            !name.toLowerCase().contains(cleanedDetail.toLowerCase())) {
           name = '$name $cleanedDetail';
         }
       }
@@ -160,31 +201,177 @@ class InvoiceOcrParser {
         costPrice: price,
         confidence: 0.9,
       );
-      if (product != null) {
-        products.add(product);
+      if (product != null) products.add(product);
+    }
+
+    // Orphan recovery pass B: price-only rows that weren't consumed get paired
+    // with the nearest preceding name-only row.
+    for (var i = 1; i < rows.length; i++) {
+      if (consumed.contains(i)) continue;
+      final rowText = rows[i].text;
+      if (_isSummaryRow(rowText)) continue;
+      final prices = _extractAllMoneyValues(rowText);
+      final residue = _removeMoneyValues(rowText).trim();
+      if (prices.isEmpty || residue.isNotEmpty) continue;
+
+      for (var j = i - 1; j >= 0 && j >= i - 3; j--) {
+        if (consumed.contains(j)) continue;
+        final prevText = rows[j].text;
+        if (_isSummaryRow(prevText) || _extractAllMoneyValues(prevText).isNotEmpty) break;
+        final namePortion = _removeMoneyValues(prevText).trim();
+        if (namePortion.isEmpty || _shouldIgnoreInVisualRow(namePortion)) continue;
+
+        var name = namePortion;
+        final quantity = _extractQuantity(name);
+        name = _removeQuantityText(name);
+        final product = _buildProduct(
+          name: name,
+          quantity: quantity ?? 1,
+          costPrice: prices.last,
+          confidence: 0.75,
+        );
+        if (product != null) {
+          products.add(product);
+          consumed.add(i);
+          consumed.add(j);
+        }
+        break;
       }
     }
 
     return products;
   }
 
-  double? _extractLastMoneyValue(String text) {
-    final matches = RegExp(
-      r'(?:R\s*)?(\d+(?:[\.,]\d{2}))',
+  /// Returns every parseable money value found in [text], in left-to-right order.
+  List<double> _extractAllMoneyValues(String text) {
+    return RegExp(
+      r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
       caseSensitive: false,
-    ).allMatches(text.replaceAll(',', '.')).toList();
+    )
+        .allMatches(text)
+        .map((m) => _parseSaPrice(m.group(0)!))
+        .whereType<double>()
+        .toList();
+  }
+
+  /// Finds a standalone integer in [nameText] that is plausibly a Qty column
+  /// value — not embedded inside a product code, SKU, or unit suffix like
+  /// "700g", "2L", "18s".  Returns the LAST such number (closest to the price
+  /// columns) that is between 1 and 999.
+  ///
+  /// Uses word-splitting rather than regex lookahead/lookbehind so that "700g"
+  /// is never split into "70" + "0g" by the regex engine.
+  int? _extractTableQuantity(String nameText) {
+    final words = nameText.trim().split(RegExp(r'\s+'));
+    final pureInt = RegExp(r'^\d+$');
+    final monthName = RegExp(
+      r'^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$',
+      caseSensitive: false,
+    );
+    // Search right-to-left for a pure integer that is NOT part of a date
+    // (e.g. skip "19" when the next word is "June").
+    for (var i = words.length - 1; i >= 0; i--) {
+      final word = words[i];
+      if (!pureInt.hasMatch(word)) continue;
+      // Skip if the following word is a month name (date context).
+      if (i + 1 < words.length && monthName.hasMatch(words[i + 1])) continue;
+      // Skip four-digit years.
+      if (word.length == 4 && word.startsWith('20')) continue;
+      final value = int.tryParse(word);
+      if (value != null && value >= 1 && value <= 999) return value;
+    }
+    return null;
+  }
+
+  /// Ignore check used inside [_parseVisualRows] — applied only to the
+  /// name portion (money values already removed), NOT to the full row text.
+  ///
+  /// Uses word-boundary matching for keywords that legitimately appear inside
+  /// product codes and reference numbers (excl, incl, date, amount, price)
+  /// to avoid false positives from reference column text.
+  bool _shouldIgnoreInVisualRow(String namePortion) {
+    final v = namePortion.toLowerCase().trim();
+    if (v.isEmpty) return true;
+
+    // Definite header / footer patterns — substring match is safe here
+    // because these phrases don't appear as parts of product codes.
+    if (v.startsWith('subtotal') ||
+        v.startsWith('sub total') ||
+        v.startsWith('sub tot') ||
+        v == 'total' ||
+        v.startsWith('total ') ||
+        v.startsWith('vat') ||
+        v.contains('banking') ||
+        v.contains('branch') ||
+        v.contains('order summary') ||
+        v.contains('thank you') ||
+        v.contains('served by') ||
+        v.contains('tax invoice') ||
+        v.contains('aerial cableway') ||
+        v.contains('cableway') ||
+        v.contains('.net') ||
+        v.contains('.com') ||
+        v.contains('invoice') ||
+        v.contains('unit price') ||
+        v.contains('unit pric') ||
+        v.contains('line total') ||
+        v.contains('line tot') ||
+        // Date rows — month names indicate a date string, not a product
+        RegExp(r'\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b').hasMatch(v) ||
+        // Four-digit year (2020–2099) almost never appears in a product name
+        RegExp(r'\b20[2-9]\d\b').hasMatch(v)) {
+      return true;
+    }
+
+    // Keywords that CAN appear inside reference codes — only ignore when
+    // they appear as standalone words (word-boundary check).
+    return RegExp(r'\bvat\b').hasMatch(v) ||
+        RegExp(r'\bexcl\b').hasMatch(v) ||
+        RegExp(r'\bincl\b').hasMatch(v) ||
+        RegExp(r'\bdescription\b').hasMatch(v) ||
+        RegExp(r'\bqty\b').hasMatch(v) ||
+        RegExp(r'\bquantity\b').hasMatch(v) ||
+        RegExp(r'\bamount\b').hasMatch(v) ||
+        RegExp(r'\bprice\b').hasMatch(v);
+  }
+
+  // Normalises an SA price string (e.g. "R 2 625,00") to a parseable double.
+  double? _parseSaPrice(String raw) {
+    // Remove currency symbol and leading/trailing space.
+    var s = raw.replaceAll(RegExp(r'^R\s*', caseSensitive: false), '').trim();
+    // If comma is the decimal separator (SA style: "2 625,00"), swap it to dot
+    // and strip the thousands space.
+    if (RegExp(r'\d,\d{2}$').hasMatch(s)) {
+      s = s.replaceAll(' ', '').replaceAll(',', '.');
+    } else {
+      // Otherwise treat comma as thousands separator ("2,625.00") – just drop it.
+      s = s.replaceAll(',', '').replaceAll(' ', '');
+    }
+    return double.tryParse(s);
+  }
+
+  double? _extractLastMoneyValue(String text) {
+    // Match SA price: optional R, then digits with optional space-thousands
+    // separator, then a comma or dot followed by exactly 2 decimal digits.
+    final matches = RegExp(
+      r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
+      caseSensitive: false,
+    ).allMatches(text).toList();
 
     if (matches.isEmpty) {
       return null;
     }
 
-    return double.tryParse(matches.last.group(1)!);
+    return _parseSaPrice(matches.last.group(0)!);
   }
 
   String _removeMoneyValues(String text) {
     return text
         .replaceAll(
-          RegExp(r'(?:R\s*)?\d+(?:[\.,]\d{2})(?:\s*ZAR)?', caseSensitive: false),
+          RegExp(
+            r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}(?:\s*ZAR)?',
+            caseSensitive: false,
+          ),
           ' ',
         )
         .replaceAll(RegExp(r'\s+'), ' ')
@@ -217,10 +404,22 @@ class InvoiceOcrParser {
   bool _isSummaryRow(String text) {
     final value = text.toLowerCase();
     return value.contains('subtotal') ||
+        value.contains('sub total') ||
+        value.contains('sub tot') ||
         value.contains('taxes') ||
-        value == 'total' ||
-        value.startsWith('total ') ||
-        value.contains('order summary');
+        value.contains('total') ||
+        value.contains('order summary') ||
+        value.contains('banking') ||
+        value.contains('branch') ||
+        value.contains('invoice') ||
+        value.contains('unit price') ||
+        value.contains('unit pric') ||
+        value.contains('line total') ||
+        value.startsWith('vat') ||
+        value.contains(' vat ') ||
+        RegExp(r'\bvat\b').hasMatch(value) ||
+        RegExp(r'\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b').hasMatch(value) ||
+        RegExp(r'\b20[2-9]\d\b').hasMatch(value);
   }
 
   ParsedInvoice parseInvoice(String rawText) {
@@ -436,7 +635,11 @@ class InvoiceOcrParser {
         value.contains('aerial cableway') ||
         value.contains('cableway co') ||
         value.contains('excl') ||
-        value.contains('incl');
+        value.contains('incl') ||
+        value.contains('banking') ||
+        value.contains('branch') ||
+        value.contains('sub total') ||
+        value.contains('sub tot');
   }
 
   ScannedProduct? _parseLine(String line) {
@@ -567,7 +770,7 @@ class InvoiceOcrParser {
     final value = line.trim();
     final lower = value.toLowerCase();
 
-    if (value.length < 4 ||
+    if (value.length < 3 ||
         _shouldIgnore(value) ||
         RegExp(r'^\d').hasMatch(value) ||
         RegExp(r'^\W+$').hasMatch(value) ||
@@ -584,18 +787,68 @@ class InvoiceOcrParser {
         !lower.contains('invoice');
   }
 
+  /// Returns true when a name is clearly OCR garbage — e.g. the price column
+  /// read sideways produces names like "R R R R R R R1 R12 6M SHIPMENT 08"
+  /// where the majority of tokens are currency/number fragments.
+  bool _isGarbageName(String name) {
+    final words = name.split(RegExp(r'\s+'));
+    if (words.isEmpty) return true;
+    final junkCount = words.where((w) {
+      return RegExp(r'^R\d*$', caseSensitive: false).hasMatch(w) ||
+          RegExp(r'^\d+$').hasMatch(w);
+    }).length;
+    return junkCount / words.length > 0.55;
+  }
+
   ScannedProduct? _buildProduct({
     required String name,
     required int quantity,
     required double costPrice,
     required double confidence,
   }) {
-    final cleanedName = name
+    var cleanedName = name
         .replaceAll(RegExp(r'[^A-Za-z0-9\s\-_/]'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
+    // Strip a leading line-number prefix (e.g. "1 MSMU4243999" → "MSMU4243999").
+    cleanedName = cleanedName.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
+
+    // Strip leading or trailing SKU / code column like "SKU-1001", "PROD-A12".
+    // Pattern: 1-6 letters, hyphen, 1-10 alphanumeric chars.
+    // This intentionally does NOT match bare product codes without a hyphen
+    // (e.g. "TCUJ3176418") so those are kept as the product name.
+    cleanedName = cleanedName
+        .replaceFirst(RegExp(r'^[A-Za-z]{1,6}-[A-Za-z0-9]{1,10}\s+'), '')
+        .replaceFirst(RegExp(r'\s+[A-Za-z]{1,6}-[A-Za-z0-9]{1,10}$'), '')
+        .trim();
+
+    // Strip trailing column-header fragments that bleed into the name row
+    // (e.g. "…Eggs Large 18s SKU" or "…Bread CODE").
+    cleanedName = cleanedName
+        .replaceAll(RegExp(r'\s+(?:SKU|CODE|REF|ITEM)\s*$', caseSensitive: false), '')
+        .trim();
+
+    // Remove leftover standalone currency prefix "R" tokens (e.g. "R POLYFIBRO" → "POLYFIBRO").
+    cleanedName = cleanedName
+        .replaceAll(RegExp(r'\bR\b\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    // Remove orphaned unit fragments like "0g", "0L", "0ml" that are left when
+    // OCR splits "700g" into "70" (extracted as qty) + "0g" (left in name).
+    cleanedName = cleanedName
+        .replaceAll(RegExp(r'\b0[A-Za-z]+\b'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
     if (cleanedName.isEmpty || quantity <= 0 || costPrice <= 0) {
+      return null;
+    }
+
+    // Reject names that are clearly OCR garbage from a rotated price column —
+    // e.g. "R R R R R R R1 R12" where most tokens are currency fragments.
+    if (_isGarbageName(cleanedName)) {
       return null;
     }
 
