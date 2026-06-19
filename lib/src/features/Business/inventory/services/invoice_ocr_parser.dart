@@ -92,36 +92,31 @@ class InvoiceOcrParser {
       for (final line in block.lines) {
         final box = line.boundingBox;
         final text = line.text.trim();
-        if (text.isEmpty) {
-          continue;
-        }
-
-        ocrLines.add(
-          _OcrTextLine(
-            text: text,
-            left: box.left,
-            right: box.right,
-            top: box.top,
-            bottom: box.bottom,
-          ),
-        );
+        if (text.isEmpty) continue;
+        ocrLines.add(_OcrTextLine(
+          text: text,
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        ));
       }
     }
 
-    if (ocrLines.isEmpty) {
-      return [];
-    }
+    if (ocrLines.isEmpty) return [];
 
     ocrLines.sort((a, b) => a.centerY.compareTo(b.centerY));
+
+    // Increase max tolerance to 50px so that moderately tilted photos still
+    // group a product name (left edge) and its price (right edge) into one row.
     final rows = <_OcrVisualRow>[];
     for (final line in ocrLines) {
       if (rows.isEmpty) {
         rows.add(_OcrVisualRow([line]));
         continue;
       }
-
       final previous = rows.last;
-      final tolerance = (line.height * 0.8).clamp(12, 34).toDouble();
+      final tolerance = (line.height * 0.9).clamp(12.0, 50.0);
       if ((line.centerY - previous.centerY).abs() <= tolerance) {
         previous.lines.add(line);
       } else {
@@ -130,26 +125,55 @@ class InvoiceOcrParser {
     }
 
     final products = <ScannedProduct>[];
-    for (var i = 0; i < rows.length; i += 1) {
+    final consumed = <int>{};
+
+    for (var i = 0; i < rows.length; i++) {
+      if (consumed.contains(i)) continue;
+
       final rowText = rows[i].text;
-      final price = _extractLastMoneyValue(rowText);
-      if (price == null || _isSummaryRow(rowText) || _shouldIgnore(rowText)) {
-        continue;
+      if (_isSummaryRow(rowText)) continue;
+
+      var price = _extractLastMoneyValue(rowText);
+      var nameSource = rowText;
+
+      // Orphan recovery pass A: this row has a name but no price.
+      // Check if the very next row is price-only (tilt caused the price column
+      // to land at a slightly different Y and form its own visual row).
+      if (price == null && i + 1 < rows.length && !consumed.contains(i + 1)) {
+        final nextText = rows[i + 1].text;
+        if (!_isSummaryRow(nextText)) {
+          final nextPrice = _extractLastMoneyValue(nextText);
+          final nextResidue = _removeMoneyValues(nextText).trim();
+          if (nextPrice != null && nextResidue.isEmpty) {
+            price = nextPrice;
+            consumed.add(i + 1);
+          }
+        }
       }
 
-      var name = _removeMoneyValues(rowText);
+      if (price == null) continue;
+
+      // Apply ignore checks only to the name portion, NOT the full row text.
+      // Using the full row would reject products whose reference column
+      // contains words like "excl", "incl", "date", or "amount".
+      final namePortion = _removeMoneyValues(nameSource);
+      if (_shouldIgnoreInVisualRow(namePortion)) continue;
+
+      var name = namePortion;
       var quantity = _extractQuantity(name);
       name = _removeQuantityText(name);
 
-      for (var offset = 1; offset <= 2 && i + offset < rows.length; offset += 1) {
+      // Try to extend the name with detail text from subsequent no-price rows.
+      for (var offset = 1; offset <= 2 && i + offset < rows.length; offset++) {
+        if (consumed.contains(i + offset)) break;
         final detailText = rows[i + offset].text;
         if (_extractLastMoneyValue(detailText) != null || _isSummaryRow(detailText)) {
           break;
         }
-
         quantity ??= _extractQuantity(detailText);
         final cleanedDetail = _removeQuantityText(detailText);
-        if (_looksLikeProductName(cleanedDetail) && !name.toLowerCase().contains(cleanedDetail.toLowerCase())) {
+        if (_looksLikeProductName(cleanedDetail) &&
+            !name.toLowerCase().contains(cleanedDetail.toLowerCase())) {
           name = '$name $cleanedDetail';
         }
       }
@@ -160,12 +184,90 @@ class InvoiceOcrParser {
         costPrice: price,
         confidence: 0.9,
       );
-      if (product != null) {
-        products.add(product);
+      if (product != null) products.add(product);
+    }
+
+    // Orphan recovery pass B: find price-only rows that were not consumed and
+    // pair each one with the closest preceding name-only row.
+    for (var i = 1; i < rows.length; i++) {
+      if (consumed.contains(i)) continue;
+      final rowText = rows[i].text;
+      if (_isSummaryRow(rowText)) continue;
+      final price = _extractLastMoneyValue(rowText);
+      final residue = _removeMoneyValues(rowText).trim();
+      if (price == null || residue.isNotEmpty) continue;
+
+      // This is a price-only row. Look backward for the nearest name-only row
+      // (no price, not a summary, not already the source of a product).
+      for (var j = i - 1; j >= 0 && j >= i - 3; j--) {
+        if (consumed.contains(j)) continue;
+        final prevText = rows[j].text;
+        if (_isSummaryRow(prevText) || _extractLastMoneyValue(prevText) != null) break;
+        final namePortion = _removeMoneyValues(prevText).trim();
+        if (namePortion.isEmpty || _shouldIgnoreInVisualRow(namePortion)) continue;
+
+        var name = namePortion;
+        var quantity = _extractQuantity(name);
+        name = _removeQuantityText(name);
+        final product = _buildProduct(
+          name: name,
+          quantity: quantity ?? 1,
+          costPrice: price,
+          confidence: 0.75,
+        );
+        if (product != null) {
+          products.add(product);
+          consumed.add(i);
+          consumed.add(j);
+        }
+        break;
       }
     }
 
     return products;
+  }
+
+  /// Ignore check used inside [_parseVisualRows] — applied only to the
+  /// name portion (money values already removed), NOT to the full row text.
+  ///
+  /// Uses word-boundary matching for keywords that legitimately appear inside
+  /// product codes and reference numbers (excl, incl, date, amount, price)
+  /// to avoid false positives from reference column text.
+  bool _shouldIgnoreInVisualRow(String namePortion) {
+    final v = namePortion.toLowerCase().trim();
+    if (v.isEmpty) return true;
+
+    // Definite header / footer patterns — substring match is safe here
+    // because these phrases don't appear as parts of product codes.
+    if (v.startsWith('subtotal') ||
+        v.startsWith('sub total') ||
+        v.startsWith('sub tot') ||
+        v == 'total' ||
+        v.startsWith('total ') ||
+        v.startsWith('vat') ||
+        v.contains('banking') ||
+        v.contains('branch') ||
+        v.contains('order summary') ||
+        v.contains('thank you') ||
+        v.contains('served by') ||
+        v.contains('tax invoice') ||
+        v.contains('aerial cableway') ||
+        v.contains('cableway') ||
+        v.contains('.net') ||
+        v.contains('.com')) {
+      return true;
+    }
+
+    // Keywords that CAN appear inside reference codes — only ignore when
+    // they appear as standalone words (word-boundary check).
+    return RegExp(r'\bvat\b').hasMatch(v) ||
+        RegExp(r'\bexcl\b').hasMatch(v) ||
+        RegExp(r'\bincl\b').hasMatch(v) ||
+        RegExp(r'\bdescription\b').hasMatch(v) ||
+        RegExp(r'\bqty\b').hasMatch(v) ||
+        RegExp(r'\bquantity\b').hasMatch(v) ||
+        RegExp(r'\bamount\b').hasMatch(v) ||
+        RegExp(r'\bprice\b').hasMatch(v);
   }
 
   // Normalises an SA price string (e.g. "R 2 625,00") to a parseable double.
@@ -597,7 +699,7 @@ class InvoiceOcrParser {
     final value = line.trim();
     final lower = value.toLowerCase();
 
-    if (value.length < 4 ||
+    if (value.length < 3 ||
         _shouldIgnore(value) ||
         RegExp(r'^\d').hasMatch(value) ||
         RegExp(r'^\W+$').hasMatch(value) ||
