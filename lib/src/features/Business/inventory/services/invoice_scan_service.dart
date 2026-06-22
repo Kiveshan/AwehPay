@@ -3,70 +3,93 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdfx/pdfx.dart';
 
-enum InvoiceImageSource { camera, gallery }
+enum InvoiceImageSource { camera, file }
 
 class InvoiceScanService {
   InvoiceScanService({ImagePicker? picker}) : _picker = picker ?? ImagePicker();
 
   final ImagePicker _picker;
 
-  Future<XFile?> pickInvoiceImage({
+  /// Returns the file path of the chosen invoice, or null if cancelled.
+  /// Camera uses [ImagePicker]; file mode uses [FilePicker] and accepts
+  /// PDF, JPG, and PNG documents.
+  Future<String?> pickInvoiceFilePath({
     required InvoiceImageSource source,
     int imageQuality = 85,
-  }) {
-    final imageSource = source == InvoiceImageSource.camera
-        ? ImageSource.camera
-        : ImageSource.gallery;
-
-    return _picker.pickImage(
-      source: imageSource,
-      imageQuality: imageQuality,
-    );
+  }) async {
+    if (source == InvoiceImageSource.camera) {
+      final image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: imageQuality,
+      );
+      return image?.path;
+    } else {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+      return result?.files.single.path;
+    }
   }
 
-  /// Runs OCR on the image, automatically trying the best rotation.
+  /// Runs OCR on an image or PDF file, automatically selecting the best
+  /// rotation from all four 90° candidates.
   ///
-  /// Some Android devices apply EXIF orientation when decoding JPEG pixels
-  /// (so pixels are already portrait-correct) while others do not. To handle
-  /// both cases without knowing which device we are on, we:
-  ///   1. Run OCR with the EXIF-derived rotation applied.
-  ///   2. If the result looks rotated (very few long lines), run OCR again
-  ///      with an additional 90° CW rotation.
-  ///   3. Return the pass whose OCR produced more distinct horizontal rows.
+  /// PDFs are rendered to a PNG image of the first page before OCR.
+  /// Each candidate is scored by checking that invoice footer keywords
+  /// appear near the bottom and header keywords near the top.
+  /// The first candidate that scores ≥ 3 is returned immediately; otherwise
+  /// the highest-scoring candidate wins.
   Future<RecognizedText> recognizeFromFilePath(String filePath) async {
-    final bytes = await File(filePath).readAsBytes();
-    final exifCwDegrees = _requiredCwRotation(bytes);
-
-    // Candidate A: EXIF-based rotation.
-    final pathA = await _rotatedTempPath(bytes, exifCwDegrees);
-    final resultA = await _ocr(pathA, originalPath: filePath);
-
-    // Only try a second rotation when the image had landscape pixels
-    // (i.e. some rotation was applied or the dimension heuristic triggered).
-    // If we're already at 0° the image was portrait — no need to try again.
-    if (exifCwDegrees == 0 && pathA == filePath) {
-      return resultA;
+    final Uint8List bytes;
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+      bytes = await _pdfFirstPageToBytes(filePath);
+    } else {
+      bytes = await File(filePath).readAsBytes();
     }
 
-    // Candidate B: one extra 90° CW on top of the EXIF-based rotation.
-    // This corrects for the double-rotation case where Flutter's codec
-    // already applied the EXIF orientation before we rotated.
-    final altDegrees = (exifCwDegrees + 90) % 360;
-    final pathB = await _rotatedTempPath(bytes, altDegrees);
-    final resultB = await _ocr(pathB, originalPath: filePath);
+    final isPdf = filePath.toLowerCase().endsWith('.pdf');
+    final exifCwDegrees = isPdf ? 0 : _requiredCwRotation(bytes);
 
-    // Prefer the result with more distinct text rows — more rows means
-    // the text was horizontal (correct orientation) rather than vertical.
-    final rowsA = _countTextRows(resultA);
-    final rowsB = _countTextRows(resultB);
+    // Try all four 90° increments, starting from the EXIF-derived rotation
+    // so the most likely correct orientation is checked first.
+    final degreesToTry = [
+      exifCwDegrees,
+      (exifCwDegrees + 90) % 360,
+      (exifCwDegrees + 270) % 360,
+      (exifCwDegrees + 180) % 360,
+    ];
 
-    _deleteTempFile(pathA, filePath);
-    _deleteTempFile(pathB, filePath);
+    RecognizedText? best;
+    int bestScore = -999;
+    int bestRows = 0;
 
-    return rowsB > rowsA ? resultB : resultA;
+    for (final degrees in degreesToTry) {
+      final path = await _rotatedTempPath(bytes, degrees);
+      final result = await _ocr(path, originalPath: filePath);
+      _deleteTempFile(path, filePath);
+
+      final score = _orientationScore(result);
+      final rows = _countTextRows(result);
+
+      // ignore: avoid_print
+      print('[InvoiceScan] rotation=$degrees° score=$score rows=$rows');
+
+      if (score > bestScore || (score == bestScore && rows > bestRows)) {
+        best = result;
+        bestScore = score;
+        bestRows = rows;
+      }
+
+      if (bestScore >= 3) break; // Clearly correct orientation — stop early.
+    }
+
+    return best!;
   }
 
   Future<String> recognizeTextFromFilePath(String filePath) async {
@@ -77,6 +100,63 @@ class InvoiceScanService {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /// Renders the first page of a PDF to PNG bytes at 2× scale for OCR.
+  Future<Uint8List> _pdfFirstPageToBytes(String pdfPath) async {
+    final document = await PdfDocument.openFile(pdfPath);
+    try {
+      final page = await document.getPage(1);
+      final pageImage = await page.render(
+        width: page.width * 2,
+        height: page.height * 2,
+        format: PdfPageImageFormat.png,
+        backgroundColor: '#ffffff',
+      );
+      await page.close();
+      return pageImage!.bytes;
+    } finally {
+      await document.close();
+    }
+  }
+
+  /// Returns a score for how "right-side up" an OCR result looks.
+  /// Footer keywords near the bottom and header keywords near the top score
+  /// positively; the same keywords in the wrong position score negatively.
+  int _orientationScore(RecognizedText result) {
+    final entries = <(double, String)>[];
+    for (final block in result.blocks) {
+      for (final line in block.lines) {
+        entries.add((line.boundingBox.center.dy, line.text.toLowerCase()));
+      }
+    }
+    if (entries.isEmpty) return 0;
+
+    final maxY = entries.map((e) => e.$1).reduce((a, b) => a > b ? a : b);
+    if (maxY == 0) return 0;
+
+    int score = 0;
+    for (final (y, text) in entries) {
+      final rel = y / maxY; // 0 = top edge, 1 = bottom edge
+      final isTop = rel < 0.35;
+      final isBottom = rel > 0.65;
+
+      if (text.contains('thank you') ||
+          text.contains('banking') ||
+          text.contains('returns') ||
+          text.contains('warranty')) {
+        if (isBottom) score += 2;
+        if (isTop) score -= 3;
+      }
+      if (text.contains('tax invoice') ||
+          text.contains('vat no') ||
+          text.contains('reg no') ||
+          text.contains('invoice no')) {
+        if (isTop) score += 2;
+        if (isBottom) score -= 3;
+      }
+    }
+    return score;
+  }
 
   Future<RecognizedText> _ocr(String path, {required String originalPath}) async {
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
@@ -96,8 +176,6 @@ class InvoiceScanService {
   }
 
   /// Returns the number of distinct horizontal text rows in the OCR result.
-  /// A higher count means the text lines are short and horizontal — the
-  /// expected layout for a correctly-oriented invoice.
   int _countTextRows(RecognizedText result) {
     final ys = <double>[];
     for (final block in result.blocks) {
@@ -115,14 +193,17 @@ class InvoiceScanService {
     return rows;
   }
 
-  /// Rotates [bytes] by [cwDegrees] clockwise and saves as a temp PNG.
-  /// Returns the original [filePath] unchanged if no rotation is needed
-  /// OR if [cwDegrees] is 0.
+  /// Rotates [bytes] by [cwDegrees] clockwise and saves as a temp file.
   Future<String> _rotatedTempPath(Uint8List bytes, int cwDegrees) async {
+    // Detect PNG vs JPEG by magic bytes so ML Kit reads the right format.
+    final isPng = bytes.length >= 4 &&
+        bytes[0] == 0x89 && bytes[1] == 0x50 &&
+        bytes[2] == 0x4E && bytes[3] == 0x47;
+    final ext = isPng ? 'png' : 'jpg';
+
     if (cwDegrees == 0) {
-      // Write bytes to a temp path so the caller always gets a deletable path.
       final tempPath =
-          '${Directory.systemTemp.path}/invoice_orig_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          '${Directory.systemTemp.path}/invoice_orig_${DateTime.now().millisecondsSinceEpoch}.$ext';
       await File(tempPath).writeAsBytes(bytes);
       return tempPath;
     }
@@ -154,9 +235,8 @@ class InvoiceScanService {
           canvas.translate(0, src.width.toDouble());
           canvas.rotate(3 * math.pi / 2);
         default:
-          // Should not happen, but fall through safely.
           final tempPath =
-              '${Directory.systemTemp.path}/invoice_orig_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              '${Directory.systemTemp.path}/invoice_orig_${DateTime.now().millisecondsSinceEpoch}.$ext';
           await File(tempPath).writeAsBytes(bytes);
           return tempPath;
       }
@@ -171,9 +251,8 @@ class InvoiceScanService {
       await File(tempPath).writeAsBytes(data!.buffer.asUint8List());
       return tempPath;
     } catch (_) {
-      // On error, return original bytes as a temp file.
       final tempPath =
-          '${Directory.systemTemp.path}/invoice_err_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          '${Directory.systemTemp.path}/invoice_err_${DateTime.now().millisecondsSinceEpoch}.$ext';
       await File(tempPath).writeAsBytes(bytes);
       return tempPath;
     }
@@ -181,31 +260,27 @@ class InvoiceScanService {
 
   /// Returns how many degrees clockwise to rotate the raw pixel data so that
   /// text is upright, based on the EXIF orientation tag.
-  /// Falls back to a dimension-based heuristic when no valid EXIF is present.
   int _requiredCwRotation(Uint8List bytes) {
     final exif = _jpegExifOrientation(bytes);
     if (exif > 0) {
       const map = {
-        1: 0,   // Normal
-        2: 0,   // Flip horizontal (ignore mirror)
-        3: 180, // Rotate 180°
-        4: 180, // Flip vertical
-        5: 90,  // Transpose
-        6: 90,  // Portrait right-side up (most common)
-        7: 270, // Transverse
-        8: 270, // Portrait upside-down
+        1: 0,
+        2: 0,
+        3: 180,
+        4: 180,
+        5: 90,
+        6: 90,
+        7: 270,
+        8: 270,
       };
       return map[exif] ?? 0;
     }
 
-    // No EXIF: landscape raw pixels → assume portrait photo → rotate 90° CW.
     final (rawW, rawH) = _jpegRawDimensions(bytes);
     if (rawW > 0 && rawH > 0 && rawW > rawH) return 90;
     return 0;
   }
 
-  /// Reads the EXIF orientation tag (0x0112) from a JPEG APP1 segment.
-  /// Returns the orientation value (1–8) or 0 if not found.
   int _jpegExifOrientation(Uint8List bytes) {
     if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) return 0;
 
@@ -235,12 +310,10 @@ class InvoiceScanService {
     return 0;
   }
 
-  /// Parses a TIFF header and returns the Orientation tag value, or 0.
   int _tiffOrientation(Uint8List bytes, int tiffStart) {
     if (tiffStart + 8 > bytes.length) return 0;
 
-    final isLE =
-        bytes[tiffStart] == 0x49 && bytes[tiffStart + 1] == 0x49;
+    final isLE = bytes[tiffStart] == 0x49 && bytes[tiffStart + 1] == 0x49;
 
     int u16(int pos) {
       if (pos + 2 > bytes.length) return 0;
@@ -277,7 +350,6 @@ class InvoiceScanService {
     return 0;
   }
 
-  /// Reads raw pixel width and height from a JPEG SOF segment.
   (int, int) _jpegRawDimensions(Uint8List bytes) {
     if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) {
       return (0, 0);

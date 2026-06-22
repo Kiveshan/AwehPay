@@ -321,7 +321,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _handleInvoiceScan() async {
-    final source = await showModalBottomSheet<InvoiceImageSource>(
+    InvoiceImageSource? source;
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -330,11 +331,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
       builder: (context) {
         return InvoiceSourceBottomSheet(
           onSelect: (choice) {
-            Navigator.of(context).pop(
-              choice == InvoiceSourceChoice.camera
-                  ? InvoiceImageSource.camera
-                  : InvoiceImageSource.gallery,
-            );
+            source = choice == InvoiceSourceChoice.camera
+                ? InvoiceImageSource.camera
+                : InvoiceImageSource.file;
+            Navigator.of(context).pop();
           },
         );
       },
@@ -350,17 +350,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
 
     try {
-      final image = await _invoiceScanService.pickInvoiceImage(source: source);
-      if (image == null) {
+      final filePath = await _invoiceScanService.pickInvoiceFilePath(source: source!);
+      if (filePath == null) {
         return;
       }
 
       final recognizedText = await _invoiceScanService.recognizeFromFilePath(
-        image.path,
+        filePath,
       );
+
+      debugPrint('=== RAW OCR TEXT ===');
+      debugPrint(recognizedText.text);
+      debugPrint('====================');
 
       final parser = InvoiceOcrParser();
       final parsed = parser.parseRecognizedText(recognizedText);
+
+      debugPrint('=== PARSED PRODUCTS (${parsed.products.length}) ===');
+      for (var i = 0; i < parsed.products.length; i++) {
+        final p = parsed.products[i];
+        debugPrint(
+          '[${i + 1}] name="${p.name}"  qty=${p.quantity}  costPrice=${p.costPrice.toStringAsFixed(2)}  confidence=${p.confidence.toStringAsFixed(2)}',
+        );
+      }
+      debugPrint('====================================================');
 
       if (parsed.products.isEmpty) {
         _showError('No readable invoice items were found. Please retry scanning.');
