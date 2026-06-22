@@ -753,6 +753,17 @@ class ApiService {
     return banks.map((bank) => Map<String, dynamic>.from(bank as Map)).toList();
   }
 
+  Future<String?> resolveAccountName({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    final response = await _client.get(
+      _uri('/payments/resolve-account?accountNumber=$accountNumber&bankCode=$bankCode'),
+    );
+    final body = _decodeResponse(response);
+    return body['accountName'] as String?;
+  }
+
   Future<Map<String, dynamic>> createPaystackSubaccount({
     required String businessId,
     required String bankAccountId,

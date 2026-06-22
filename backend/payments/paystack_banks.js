@@ -40,4 +40,35 @@ router.get('/banks', async (req, res) => {
   }
 });
 
+// GET /payments/resolve-account?accountNumber=...&bankCode=...
+router.get('/resolve-account', async (req, res) => {
+  try {
+    const { accountNumber, bankCode } = req.query;
+
+    if (!accountNumber || !bankCode) {
+      return res.status(400).json({ error: 'accountNumber and bankCode are required' });
+    }
+
+    const paystackResponse = await axios.get('https://api.paystack.co/bank/resolve', {
+      params: { account_number: accountNumber, bank_code: bankCode },
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      },
+    });
+
+    const data = paystackResponse.data?.data;
+
+    res.json({
+      success: true,
+      accountName: data?.account_name ?? null,
+    });
+  } catch (error) {
+    console.error('resolve_account error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      success: false,
+      error: error.response?.data?.message || error.message,
+    });
+  }
+});
+
 module.exports = router;

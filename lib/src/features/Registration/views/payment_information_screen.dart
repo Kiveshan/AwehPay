@@ -34,10 +34,60 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
   String? _banksLoadError;
   String? _selectedBankCode;
 
+  bool _isVerifyingAccount = false;
+  String? _resolvedAccountName;
+  String? _accountVerifyError;
+
   @override
   void initState() {
     super.initState();
     _loadBanks();
+    _accountNumberController.addListener(_resetAccountVerification);
+  }
+
+  void _resetAccountVerification() {
+    if (_resolvedAccountName != null || _accountVerifyError != null) {
+      setState(() {
+        _resolvedAccountName = null;
+        _accountVerifyError = null;
+      });
+    }
+  }
+
+  Future<void> _verifyAccount() async {
+    final accountNumber = _accountNumberController.text.trim();
+
+    if (_selectedBankCode == null || accountNumber.isEmpty) {
+      setState(() {
+        _accountVerifyError = 'Select a bank and enter an account number first';
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingAccount = true;
+      _resolvedAccountName = null;
+      _accountVerifyError = null;
+    });
+
+    try {
+      final accountName = await _apiService.resolveAccountName(
+        accountNumber: accountNumber,
+        bankCode: _selectedBankCode!,
+      );
+      setState(() {
+        _resolvedAccountName = accountName;
+        _accountVerifyError = accountName == null ? 'Could not verify this account' : null;
+      });
+    } catch (e) {
+      setState(() {
+        _accountVerifyError = 'Could not verify this account';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingAccount = false);
+      }
+    }
   }
 
   Future<void> _loadBanks() async {
@@ -62,6 +112,7 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
 
   @override
   void dispose() {
+    _accountNumberController.removeListener(_resetAccountVerification);
     _accountNumberController.dispose();
     _accountTypeController.dispose();
     _branchNameController.dispose();
@@ -195,7 +246,11 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
                       )
                       .toList(),
                   onChanged: (value) {
-                    setState(() => _selectedBankCode = value);
+                    setState(() {
+                      _selectedBankCode = value;
+                      _resolvedAccountName = null;
+                      _accountVerifyError = null;
+                    });
                   },
                 ),
               const SizedBox(height: 18),
@@ -206,7 +261,48 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
                 keyboardType: TextInputType.number,
                 suffixIcon: const Icon(Icons.numbers_outlined, size: 18),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _isVerifyingAccount ? null : _verifyAccount,
+                  icon: _isVerifyingAccount
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.verified_outlined, size: 16),
+                  label: Text(_isVerifyingAccount ? 'Verifying...' : 'Verify account'),
+                ),
+              ),
+              if (_resolvedAccountName != null)
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Account holder: $_resolvedAccountName',
+                        style: const TextStyle(color: Colors.green, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              if (_accountVerifyError != null)
+                Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _accountVerifyError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 10),
               AdminTextField(
                 label: 'Account Type',
                 hintText: 'Enter account type',
