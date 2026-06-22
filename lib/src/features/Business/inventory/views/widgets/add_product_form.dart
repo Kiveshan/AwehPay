@@ -198,7 +198,7 @@ class _CategoryDropdown extends StatelessWidget {
         const Text(
           'Product Category',
           style: TextStyle(
-            color: Color(0xFF6C7078),
+            color: Color(0xFF272A2F),
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -222,7 +222,7 @@ class _CategoryDropdown extends StatelessWidget {
               style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
               hint: const Text(
                 'Select a category',
-                style: TextStyle(color: Color(0xFF6C7078), fontSize: 13),
+                style: TextStyle(color: Color(0xFF4A4E57), fontSize: 13),
               ),
               items: options
                   .map((o) => DropdownMenuItem(value: o, child: Text(o)))
