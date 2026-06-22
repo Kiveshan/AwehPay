@@ -5,7 +5,32 @@ const admin = require('firebase-admin');
 
 dotenv.config();
 
-const serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+// Load Firebase service-account credentials.
+// - Cloud (Elastic Beanstalk): full JSON injected via the FIREBASE_SERVICE_ACCOUNT
+//   env var (sourced from AWS Secrets Manager / EB environment properties).
+// - Local dev: GOOGLE_APPLICATION_CREDENTIALS points at the JSON key file on disk.
+function loadServiceAccount() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (err) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON: ${err.message}`
+      );
+    }
+  }
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  }
+
+  throw new Error(
+    'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT (JSON string, for ' +
+      'cloud/Beanstalk) or GOOGLE_APPLICATION_CREDENTIALS (file path, for local dev).'
+  );
+}
+
+const serviceAccount = loadServiceAccount();
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
