@@ -61,6 +61,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _quantityModified = false;
   bool _productNameLockedBySelection = false;
   String? _selectedProductId;
+  String? _selectedCategory;
   List<String> _productOptions = [];
   List<String> _categoryOptions = ['Other'];
   final Map<String, Map<String, dynamic>> _productDataByName = {};
@@ -71,9 +72,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _productNameController = TextEditingController(
       text: widget.lockedProductName ?? '',
     );
-    _categoryController = TextEditingController(
-      text: widget.lockedCategory ?? '',
-    );
+    _categoryController = TextEditingController();
+    if (widget.lockedCategory != null && widget.lockedCategory!.isNotEmpty) {
+      _selectedCategory = widget.lockedCategory;
+    }
     final hasPrefillBarcode =
         widget.prefillBarcode != null && widget.prefillBarcode!.isNotEmpty;
     _barcodeController = TextEditingController(
@@ -111,6 +113,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           setState(() {
             _productNameLockedBySelection = false;
             _selectedProductId = null;
+            _selectedCategory = null;
             _categoryController.clear();
             _costPriceController.clear();
             _sellingPriceController.clear();
@@ -182,6 +185,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             lockedCategory: widget.lockedCategory,
                             productOptions: _productOptions,
                             categoryOptions: _categoryOptions,
+                            selectedCategory: _selectedCategory,
+                            onCategoryChanged: (value) {
+                              setState(() {
+                                _selectedCategory = value;
+                                if (value != 'Other') {
+                                  _categoryController.clear();
+                                }
+                              });
+                            },
                             productNameController: _productNameController,
                             categoryController: _categoryController,
                             barcodeController: _barcodeController,
@@ -289,6 +301,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           setState(() {
             _selectedProductId = null;
             _productNameLockedBySelection = false;
+            _selectedCategory = null;
             _hasScannedBarcode = true;
             _barcodeController.text = barcode.trim();
             _productNameController.clear();
@@ -410,7 +423,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _productNameLockedBySelection = lockSelection;
       _hasScannedBarcode = true;
       _productNameController.text = (product['name'] as String?) ?? '';
-      _categoryController.text = (product['category'] as String?) ?? '';
+      final productCategory = (product['category'] as String?) ?? '';
+      if (productCategory.isNotEmpty && _categoryOptions.contains(productCategory)) {
+        _selectedCategory = productCategory;
+        _categoryController.clear();
+      } else if (productCategory.isNotEmpty) {
+        _selectedCategory = 'Other';
+        _categoryController.text = productCategory;
+      } else {
+        _selectedCategory = null;
+        _categoryController.clear();
+      }
       _barcodeController.text = (product['barcode'] as String?) ?? '';
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
@@ -433,7 +456,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _saveProduct() async {
     final name = _productNameController.text.trim();
-    final category = _categoryController.text.trim();
+    final category = _selectedCategory == 'Other'
+        ? _categoryController.text.trim()
+        : (_selectedCategory ?? '');
     final costPrice = _parseMoney(_costPriceController.text);
     final sellingPrice = _parseMoney(_sellingPriceController.text);
     final stockQuantity = int.tryParse(_quantityController.text.trim());
