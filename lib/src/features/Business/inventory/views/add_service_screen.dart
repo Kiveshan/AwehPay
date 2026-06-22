@@ -66,8 +66,6 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                             _InputField(
                               label: 'Service Name',
                               controller: _serviceNameController,
-                              prefixIcon: Icons.search_rounded,
-                              suffixIcon: Icons.keyboard_arrow_down_rounded,
                             ),
                             const SizedBox(height: 18),
                             _CategoryDropdown(
@@ -269,8 +267,6 @@ class _InputField extends StatelessWidget {
   const _InputField({
     required this.label,
     required this.controller,
-    this.prefixIcon,
-    this.suffixIcon,
     this.keyboardType,
     this.spinnerColor,
     this.onIncrement,
@@ -279,8 +275,6 @@ class _InputField extends StatelessWidget {
 
   final String label;
   final TextEditingController controller;
-  final IconData? prefixIcon;
-  final IconData? suffixIcon;
   final TextInputType? keyboardType;
   final Color? spinnerColor;
   final VoidCallback? onIncrement;
@@ -304,10 +298,6 @@ class _InputField extends StatelessWidget {
               borderRadius: BorderRadius.circular(6)),
           child: Row(
             children: [
-              if (prefixIcon != null) ...[
-                const SizedBox(width: 12),
-                Icon(prefixIcon, color: const Color(0xFF272A2F), size: 18),
-              ],
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -322,8 +312,6 @@ class _InputField extends StatelessWidget {
                       const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
                 ),
               ),
-              if (suffixIcon != null)
-                Icon(suffixIcon, color: const Color(0xFF272A2F), size: 20),
               if (onIncrement != null || onDecrement != null) ...[
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
