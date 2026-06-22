@@ -13,8 +13,19 @@ and Paystack. It is deployed to **AWS Elastic Beanstalk**. CI auto-deploys the
 
 | Environment | Variable | Value |
 |---|---|---|
-| **Cloud (Beanstalk)** | `FIREBASE_SERVICE_ACCOUNT` | the **entire** service-account JSON, as a single-line string |
+| **Cloud (Beanstalk)** | `FIREBASE_SERVICE_ACCOUNT_B64` | **base64** of the service-account JSON file (preferred — survives EB transport intact) |
 | **Local dev** | `GOOGLE_APPLICATION_CREDENTIALS` | file path to the JSON key on disk |
+
+> Pasting the **raw** JSON into an EB environment property corrupts the private key's
+> newlines and fails with `Failed to parse private key: Only 8, 16, 24, or 32 bits
+> supported`. Use the base64 variable instead. Generate it on Windows PowerShell:
+>
+> ```powershell
+> [Convert]::ToBase64String([IO.File]::ReadAllBytes("awehpay-firebase-adminsdk-fbsvc-bf97993378.json"))
+> ```
+>
+> (macOS/Linux: `base64 -w0 awehpay-firebase-adminsdk-...json`.) Copy the single-line
+> output and set it as `FIREBASE_SERVICE_ACCOUNT_B64`.
 
 Other required env vars:
 
@@ -41,7 +52,7 @@ Other required env vars:
 ### b. Set environment properties
 EB console → your environment → **Configuration → Updates, monitoring, and logging →
 Environment properties** (or **Software**). Add:
-- `FIREBASE_SERVICE_ACCOUNT` = paste the full service-account JSON (minified to one line).
+- `FIREBASE_SERVICE_ACCOUNT_B64` = the base64 string generated above (single line).
 - `PAYSTACK_SECRET_KEY` = your Paystack secret key.
 
 Apply. The environment restarts with the new config.

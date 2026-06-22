@@ -6,28 +6,54 @@ const admin = require('firebase-admin');
 dotenv.config();
 
 // Load Firebase service-account credentials.
-// - Cloud (Elastic Beanstalk): full JSON injected via the FIREBASE_SERVICE_ACCOUNT
-//   env var (sourced from AWS Secrets Manager / EB environment properties).
+// - Cloud (Elastic Beanstalk): PREFER FIREBASE_SERVICE_ACCOUNT_B64 — the base64 of the
+//   JSON key file. base64 has no newlines/quotes, so the private key survives EB
+//   environment-property transport intact. FIREBASE_SERVICE_ACCOUNT (raw JSON) also works
+//   but can corrupt the PEM newlines depending on how it's set.
 // - Local dev: GOOGLE_APPLICATION_CREDENTIALS points at the JSON key file on disk.
 function loadServiceAccount() {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  let serviceAccount;
+
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+    const json = Buffer.from(
+      process.env.FIREBASE_SERVICE_ACCOUNT_B64,
+      'base64'
+    ).toString('utf8');
     try {
-      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      serviceAccount = JSON.parse(json);
+    } catch (err) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_B64 did not decode to valid JSON: ${err.message}`
+      );
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     } catch (err) {
       throw new Error(
         `FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON: ${err.message}`
       );
     }
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  } else {
+    throw new Error(
+      'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT_B64 (base64 JSON, ' +
+        'preferred for cloud/Beanstalk) or GOOGLE_APPLICATION_CREDENTIALS (file path, ' +
+        'for local dev).'
+    );
   }
 
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  // Safety net: if the private key arrived with escaped "\n" literals instead of real
+  // newlines, restore them so node-forge can parse the PEM.
+  if (
+    serviceAccount.private_key &&
+    serviceAccount.private_key.includes('\\n')
+  ) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
   }
 
-  throw new Error(
-    'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT (JSON string, for ' +
-      'cloud/Beanstalk) or GOOGLE_APPLICATION_CREDENTIALS (file path, for local dev).'
-  );
+  return serviceAccount;
 }
 
 const serviceAccount = loadServiceAccount();
