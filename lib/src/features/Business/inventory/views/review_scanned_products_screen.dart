@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/scanned_product.dart';
+import '../inventory_timestamp.dart';
 
 class ReviewScannedProductsArgs {
   const ReviewScannedProductsArgs({
@@ -84,6 +85,7 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
       );
 
       if (!mounted) return;
+      InventoryTimestamp.markChanged();
       _showMessage('Scanned products saved successfully.');
       context.pop(true);
     } catch (error) {

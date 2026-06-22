@@ -13,6 +13,7 @@ import '../../../../core/widgets/scan_type_bottom_sheet.dart';
 import '../../../../core/widgets/invoice_source_bottom_sheet.dart';
 
 import '../services/invoice_ocr_parser.dart';
+import '../inventory_timestamp.dart';
 import '../services/invoice_scan_service.dart';
 import 'widgets/add_product_form.dart';
 
@@ -517,6 +518,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       if (!mounted) return;
+      InventoryTimestamp.markChanged();
       if (_selectedProductId != null) {
         context.pop();
       } else {

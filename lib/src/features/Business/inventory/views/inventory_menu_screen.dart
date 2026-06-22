@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../inventory_timestamp.dart';
 
 class InventoryMenuScreen extends StatefulWidget {
   const InventoryMenuScreen({super.key});
@@ -17,7 +18,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
   String _selectedType = 'Product';
   final _apiService = ApiService();
   int? _lowStockCount;
-  DateTime? _lastUpdatedAt;
+  DateTime? _lastFetchedAt;
   Timer? _tickTimer;
 
   @override
@@ -37,8 +38,9 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
   }
 
   String _formatAge() {
-    if (_lastUpdatedAt == null) return 'updating…';
-    final diff = DateTime.now().difference(_lastUpdatedAt!);
+    final ts = InventoryTimestamp.lastChangedAt ?? _lastFetchedAt;
+    if (ts == null) return 'updating…';
+    final diff = DateTime.now().difference(ts);
     if (diff.inSeconds < 60) return 'updated just now';
     if (diff.inMinutes < 60) {
       final m = diff.inMinutes;
@@ -60,7 +62,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
         }).length;
         if (mounted) setState(() {
           _lowStockCount = count;
-          _lastUpdatedAt = DateTime.now();
+          _lastFetchedAt = DateTime.now();
         });
       }
     } catch (_) {
@@ -107,6 +109,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                         stackButtons: isCompact,
                         actionHeight: actionHeight,
                         selectedType: _selectedType,
+                        listSubtitle: _formatAge(),
                         onAddTap: () async {
                           await context.push(
                             _selectedType == 'Product'
@@ -134,19 +137,6 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                             if (mounted) _loadLowStockCount();
                           },
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _InventoryActionButton(
-                          icon: Icons.list_rounded,
-                          label: _selectedType == 'Product' ? 'Product List' : 'Service List',
-                          subtitle: _formatAge(),
-                          onTap: () async {
-                            await context.push(_selectedType == 'Product' ? AppRoutes.productList : AppRoutes.serviceList);
-                            if (mounted) _loadLowStockCount();
-                          },
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -253,6 +243,7 @@ class _InventoryActionButtons extends StatelessWidget {
     required this.stackButtons,
     required this.actionHeight,
     required this.selectedType,
+    required this.listSubtitle,
     required this.onAddTap,
     required this.onListTap,
   });
@@ -260,6 +251,7 @@ class _InventoryActionButtons extends StatelessWidget {
   final bool stackButtons;
   final double actionHeight;
   final String selectedType;
+  final String listSubtitle;
   final VoidCallback onAddTap;
   final VoidCallback onListTap;
 
@@ -275,7 +267,7 @@ class _InventoryActionButtons extends StatelessWidget {
     final listButton = _InventoryActionButton(
       icon: Icons.list_rounded,
       label: selectedType == 'Product' ? 'Product List' : 'Service List',
-      subtitle: 'updated 5 min ago',
+      subtitle: listSubtitle,
       height: actionHeight,
       onTap: onListTap,
     );
