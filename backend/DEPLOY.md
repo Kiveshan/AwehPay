@@ -69,10 +69,10 @@ The included [`.ebextensions/options.config`](.ebextensions/options.config) poin
 balancer health check at `/health` and enables enhanced health. Nothing to do manually.
 
 ### d. HTTPS + domain (prod)
-1. Request/import a cert for `api.awehpay.com` in **AWS Certificate Manager** (same region).
+1. Request/import a cert for `api.awehpay.co.za` in **AWS Certificate Manager** (same region).
 2. EB → Configuration → **Load balancer** → add an **HTTPS:443** listener using that cert.
-3. Point `api.awehpay.com` (Route 53 or your DNS) at the EB load balancer.
-4. In Paystack, set the webhook URL to `https://api.awehpay.com/webhooks/paystack`.
+3. Point `api.awehpay.co.za` (Route 53 or your DNS) at the EB load balancer.
+4. In Paystack, set the webhook URL to `https://api.awehpay.co.za/webhooks/paystack`.
 
 ### e. IAM user for CI
 1. IAM → create a user, e.g. `github-actions-eb-deploy`, **programmatic access**.
@@ -112,7 +112,7 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 ## 5. Build the mobile app against prod
 
 ```bash
-flutter build appbundle --dart-define=AWEHPAY_API_BASE_URL=https://api.awehpay.com
+flutter build appbundle --dart-define=AWEHPAY_API_BASE_URL=https://api.awehpay.co.za
 ```
 
 (Use the same `--dart-define` for `flutter build ipa` on iOS.)
