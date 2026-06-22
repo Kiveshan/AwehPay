@@ -107,6 +107,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                         stackButtons: isCompact,
                         actionHeight: actionHeight,
                         selectedType: _selectedType,
+                        subtitle: _formatAge(),
                         onAddTap: () async {
                           await context.push(
                             _selectedType == 'Product'
@@ -134,19 +135,6 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                             if (mounted) _loadLowStockCount();
                           },
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _InventoryActionButton(
-                          icon: Icons.list_rounded,
-                          label: _selectedType == 'Product' ? 'Product List' : 'Service List',
-                          subtitle: _formatAge(),
-                          onTap: () async {
-                            await context.push(_selectedType == 'Product' ? AppRoutes.productList : AppRoutes.serviceList);
-                            if (mounted) _loadLowStockCount();
-                          },
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -253,6 +241,7 @@ class _InventoryActionButtons extends StatelessWidget {
     required this.stackButtons,
     required this.actionHeight,
     required this.selectedType,
+    this.subtitle,
     required this.onAddTap,
     required this.onListTap,
   });
@@ -260,6 +249,7 @@ class _InventoryActionButtons extends StatelessWidget {
   final bool stackButtons;
   final double actionHeight;
   final String selectedType;
+  final String? subtitle;
   final VoidCallback onAddTap;
   final VoidCallback onListTap;
 
@@ -275,7 +265,7 @@ class _InventoryActionButtons extends StatelessWidget {
     final listButton = _InventoryActionButton(
       icon: Icons.list_rounded,
       label: selectedType == 'Product' ? 'Product List' : 'Service List',
-      subtitle: 'updated 5 min ago',
+      subtitle: subtitle,
       height: actionHeight,
       onTap: onListTap,
     );
