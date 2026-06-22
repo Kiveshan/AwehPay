@@ -14,6 +14,7 @@ class RegistrationDraft {
   String province = '';
   String country = '';
   String bankName = '';
+  String bankCode = '';
   String accountNumber = '';
   String accountType = '';
   String branchName = '';

@@ -29,6 +29,8 @@ const salesTrackingBackend = require('./business/Sales_tracking/sales_tracking_b
 const salesTrackingQueries = require('./business/Sales_tracking/sales_tracking_queries');
 const adminBusinessBackend = require('./admin/admin_business_backend');
 const adminAnalyticsBackend = require('./admin/analytics_backend');
+const paystackBanks = require('./payments/paystack_banks');
+const createSubaccount = require('./payments/create_subaccount');
 
 const app = express();
 
@@ -55,6 +57,8 @@ app.use('/inventory/product', reviewScannedProductsBackend);
 app.use('/inventory/product', productDetailsBackend);
 app.use('/admin/businesses', adminBusinessBackend);
 app.use('/admin/analytics', adminAnalyticsBackend);
+app.use('/payments', paystackBanks);
+app.use('/payments', createSubaccount);
 
 const db = admin.firestore();
 const auth = admin.auth();

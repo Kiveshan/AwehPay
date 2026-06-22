@@ -59,7 +59,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
           'itemId': item.itemId,
           'name': item.name,
           'type': item.type,
-          'quantity': 1,
+          'quantity': item.quantity,
           'unitPrice': unitPrice,
         };
       }).toList();
@@ -135,45 +135,50 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            ...widget.items.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+            ...widget.items.map((item) {
+              final unitPrice =
+                  double.tryParse(item.price.replaceAll('R', '').replaceAll(',', '')) ?? 0.0;
+              final lineTotal = unitPrice * item.quantity;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${item.name} x${item.quantity}',
+                            style: const TextStyle(
+                              color: Color(0xFF272A2F),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (item.barcode.isNotEmpty)
                             Text(
-                              item.name,
+                              item.barcode,
                               style: const TextStyle(
-                                color: Color(0xFF272A2F),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF9B9B9B),
+                                fontSize: 12,
                               ),
                             ),
-                            if (item.barcode.isNotEmpty)
-                              Text(
-                                item.barcode,
-                                style: const TextStyle(
-                                  color: Color(0xFF9B9B9B),
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
-                      Text(
-                        item.price,
-                        style: const TextStyle(
-                          color: Color(0xFF272A2F),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
+                    ),
+                    Text(
+                      'R${lineTotal % 1 == 0 ? lineTotal.toInt() : lineTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Color(0xFF272A2F),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 8),
             const Text(
               'Amount to be paid:',

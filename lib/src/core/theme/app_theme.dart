@@ -5,7 +5,10 @@ import 'app_colors.dart';
 
 abstract final class AppTheme {
   static ThemeData get light {
-    final textTheme = GoogleFonts.interTextTheme();
+    final textTheme = GoogleFonts.interTextTheme().apply(
+      bodyColor: Colors.black,
+      displayColor: Colors.black,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -18,6 +21,12 @@ abstract final class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.background,
       textTheme: textTheme,
+      primaryTextTheme: textTheme,
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: Colors.black,
+        selectionColor: Color(0x66333333),
+        selectionHandleColor: Colors.black,
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         backgroundColor: AppColors.background,

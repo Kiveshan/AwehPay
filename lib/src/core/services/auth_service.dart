@@ -190,6 +190,19 @@ class AuthService {
     });
 
     await batch.commit();
+
+    try {
+      await _apiService.createPaystackSubaccount(
+        businessId: businessRef.id,
+        bankAccountId: bankRef.id,
+        businessName: draft.businessName.trim(),
+        bankCode: draft.bankCode.trim(),
+        accountNumber: draft.accountNumber.trim(),
+      );
+    } catch (_) {
+      // Best-effort: registration should still succeed if Paystack is
+      // unavailable. The subaccount can be created later from admin tools.
+    }
   }
 
   String _lastFour(String value) {

@@ -73,32 +73,64 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Header(),
-              const SizedBox(height: 32),
-              _ProductDropdown(
-                selectedType: _selectedType,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedType = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 32),
-              Column(
-                children: [
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 340;
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
+            final horizontalPadding = isCompact ? 16.0 : 24.0;
+            final sectionSpacing = isLandscape ? 18.0 : 32.0;
+            final actionSpacing = isLandscape ? 18.0 : 50.0;
+            final actionHeight = isLandscape ? 118.0 : 160.0;
+            final contentMaxWidth =
+                constraints.maxWidth > 900 ? 760.0 : double.infinity;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(horizontalPadding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _InventoryActionButton(
-                          icon: Icons.add_rounded,
-                          label: _selectedType == 'Product' ? 'Add Products to Stock' : 'Add Services',
+                      _Header(),
+                      SizedBox(height: sectionSpacing),
+                      _ProductDropdown(
+                        selectedType: _selectedType,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedType = value!;
+                          });
+                        },
+                      ),
+                      SizedBox(height: sectionSpacing),
+                      _InventoryActionButtons(
+                        stackButtons: isCompact,
+                        actionHeight: actionHeight,
+                        selectedType: _selectedType,
+                        onAddTap: () async {
+                          await context.push(
+                            _selectedType == 'Product'
+                                ? AppRoutes.addProduct
+                                : AppRoutes.addService,
+                          );
+                          if (mounted) _loadLowStockCount();
+                        },
+                        onListTap: () async {
+                          await context.push(
+                            _selectedType == 'Product'
+                                ? AppRoutes.productList
+                                : AppRoutes.serviceList,
+                          );
+                          if (mounted) _loadLowStockCount();
+                        },
+                      ),
+                      SizedBox(height: actionSpacing),
+                      if (_selectedType == 'Product' &&
+                          (_lowStockCount == null || _lowStockCount! > 0))
+                        _LowStockWarningBar(
+                          count: _lowStockCount,
                           onTap: () async {
-                            await context.push(_selectedType == 'Product' ? AppRoutes.addProduct : AppRoutes.addService);
+                            await context.push(AppRoutes.lowStockList);
                             if (mounted) _loadLowStockCount();
                           },
                         ),
@@ -117,20 +149,10 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 50),
-                  if (_selectedType == 'Product' &&
-                      (_lowStockCount == null || _lowStockCount! > 0))
-                    _LowStockWarningBar(
-                      count: _lowStockCount,
-                      onTap: () async {
-                        await context.push(AppRoutes.lowStockList);
-                        if (mounted) _loadLowStockCount();
-                      },
-                    ),
-                ],
+                ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -226,17 +248,71 @@ class _ProductDropdown extends StatelessWidget {
   }
 }
 
+class _InventoryActionButtons extends StatelessWidget {
+  const _InventoryActionButtons({
+    required this.stackButtons,
+    required this.actionHeight,
+    required this.selectedType,
+    required this.onAddTap,
+    required this.onListTap,
+  });
+
+  final bool stackButtons;
+  final double actionHeight;
+  final String selectedType;
+  final VoidCallback onAddTap;
+  final VoidCallback onListTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final addButton = _InventoryActionButton(
+      icon: Icons.add_rounded,
+      label:
+          selectedType == 'Product' ? 'Add Products to Stock' : 'Add Services',
+      height: actionHeight,
+      onTap: onAddTap,
+    );
+    final listButton = _InventoryActionButton(
+      icon: Icons.list_rounded,
+      label: selectedType == 'Product' ? 'Product List' : 'Service List',
+      subtitle: 'updated 5 min ago',
+      height: actionHeight,
+      onTap: onListTap,
+    );
+
+    if (stackButtons) {
+      return Column(
+        children: [
+          addButton,
+          const SizedBox(height: 16),
+          listButton,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: addButton),
+        const SizedBox(width: 16),
+        Expanded(child: listButton),
+      ],
+    );
+  }
+}
+
 class _InventoryActionButton extends StatelessWidget {
   const _InventoryActionButton({
     required this.icon,
     required this.label,
     this.subtitle,
+    required this.height,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String? subtitle;
+  final double height;
   final VoidCallback onTap;
 
   @override
@@ -245,7 +321,8 @@ class _InventoryActionButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 160,
+        width: double.infinity,
+        height: height,
         decoration: BoxDecoration(
           color: const Color(0xFFF5C9B7),
           borderRadius: BorderRadius.circular(16),
@@ -261,7 +338,7 @@ class _InventoryActionButton extends StatelessWidget {
                 child: Icon(
                   icon,
                   color: Colors.white,
-                  size: 48,
+                  size: height < 140 ? 36 : 48,
                 ),
               ),
               Column(
@@ -274,6 +351,8 @@ class _InventoryActionButton extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (subtitle != null)
                     Text(
@@ -282,6 +361,8 @@ class _InventoryActionButton extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),

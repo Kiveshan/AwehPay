@@ -28,9 +28,12 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _serviceNameController = TextEditingController(text: widget.service?['name'] as String? ?? 'Gel nails with tips');
-    _durationController = TextEditingController(text: widget.service?['duration'] as String? ?? '45');
-    _costPriceController = TextEditingController(text: widget.service?['costPrice'] as String? ?? 'R 200.00');
+    _serviceNameController = TextEditingController(
+        text: widget.service?['name'] as String? ?? 'Gel nails with tips');
+    _durationController = TextEditingController(
+        text: widget.service?['duration'] as String? ?? '45');
+    _costPriceController = TextEditingController(
+        text: widget.service?['costPrice'] as String? ?? 'R 200.00');
     final category = widget.service?['category'] as String? ?? 'Nail Care';
     _selectedCategory = _isDefaultCategory(category) ? category : 'Other';
     _otherCategoryController = TextEditingController(
@@ -52,84 +55,75 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _Header(title: 'Service List'),
-              const SizedBox(height: 48),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(border: Border.all(color: const Color(0xFFF5C9B7))),
-                child: Column(
-                  children: [
-                    _InputField(label: 'Service Name', controller: _serviceNameController),
-                    const SizedBox(height: 18),
-                    _CategoryDropdown(
-                      label: 'Service Category',
-                      value: _selectedCategory,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCategory = value!;
-                        });
-                      },
-                    ),
-                    if (_selectedCategory == 'Other') ...[
-                      const SizedBox(height: 18),
-                      _InputField(
-                        label: 'Other Service Category',
-                        controller: _otherCategoryController,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 420;
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
+            final horizontalPadding = isCompact ? 16.0 : 24.0;
+            final topSpacing = isLandscape ? 20.0 : 48.0;
+            final formMaxWidth =
+                constraints.maxWidth > 700 ? 640.0 : double.infinity;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(horizontalPadding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: formMaxWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _Header(title: 'Service List'),
+                      SizedBox(height: topSpacing),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(isCompact ? 12 : 14),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFF5C9B7))),
+                        child: Column(
+                          children: [
+                            _InputField(
+                                label: 'Service Name',
+                                controller: _serviceNameController),
+                            const SizedBox(height: 18),
+                            _CategoryDropdown(
+                              label: 'Service Category',
+                              value: _selectedCategory,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedCategory = value!;
+                                });
+                              },
+                            ),
+                            if (_selectedCategory == 'Other') ...[
+                              const SizedBox(height: 18),
+                              _InputField(
+                                label: 'Other Service Category',
+                                controller: _otherCategoryController,
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            _ServicePricingFields(
+                              stackFields: isCompact,
+                              durationController: _durationController,
+                              costPriceController: _costPriceController,
+                            ),
+                            const SizedBox(height: 24),
+                            _ServiceActionButtons(
+                              stackButtons: isCompact,
+                              isSavingService: _isSavingService,
+                              isDeletingService: _isDeletingService,
+                              onUpdateService: _updateService,
+                              onDeleteService: _deleteService,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _InputField(
-                            label: 'Duration (min)',
-                            controller: _durationController,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 28),
-                        Expanded(
-                          child: _InputField(
-                            label: 'Cost Price',
-                            controller: _costPriceController,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Update Service',
-                            icon: Icons.sync_rounded,
-                            color: const Color(0xFFF5C9B7),
-                            onTap: _isSavingService ? null : _updateService,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Delete Service',
-                            icon: Icons.delete_rounded,
-                            color: const Color(0xFFE68888),
-                            onTap: _isDeletingService ? null : _deleteService,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -260,19 +254,26 @@ class _Header extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Image.asset('assets/images/logo.png', width: 48, height: 48, fit: BoxFit.contain),
+        Image.asset('assets/images/logo.png',
+            width: 48, height: 48, fit: BoxFit.contain),
         Text(
           title,
-          style: const TextStyle(color: Color(0xFF272A2F), fontSize: 24, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+              color: Color(0xFF272A2F),
+              fontSize: 24,
+              fontWeight: FontWeight.w800),
         ),
         GestureDetector(
           onTap: () => context.pop(),
           child: Container(
             width: 58,
             height: 34,
-            decoration: BoxDecoration(color: const Color(0xFFFEEAB8), borderRadius: BorderRadius.circular(18)),
+            decoration: BoxDecoration(
+                color: const Color(0xFFFEEAB8),
+                borderRadius: BorderRadius.circular(18)),
             alignment: Alignment.center,
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            child: const Icon(Icons.arrow_back_rounded,
+                color: Colors.white, size: 28),
           ),
         ),
       ],
@@ -281,7 +282,8 @@ class _Header extends StatelessWidget {
 }
 
 class _InputField extends StatelessWidget {
-  const _InputField({required this.label, required this.controller, this.keyboardType});
+  const _InputField(
+      {required this.label, required this.controller, this.keyboardType});
 
   final String label;
   final TextEditingController controller;
@@ -292,18 +294,25 @@ class _InputField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF6C7078), fontSize: 14, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                color: Color(0xFF6C7078),
+                fontSize: 14,
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Container(
           height: 44,
-          decoration: BoxDecoration(border: Border.all(color: const Color(0xFFC9CED6)), borderRadius: BorderRadius.circular(6)),
+          decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFC9CED6)),
+              borderRadius: BorderRadius.circular(6)),
           child: TextField(
             controller: controller,
             keyboardType: keyboardType,
             textAlignVertical: TextAlignVertical.center,
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             ),
             style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
           ),
@@ -313,8 +322,103 @@ class _InputField extends StatelessWidget {
   }
 }
 
+class _ServicePricingFields extends StatelessWidget {
+  const _ServicePricingFields({
+    required this.stackFields,
+    required this.durationController,
+    required this.costPriceController,
+  });
+
+  final bool stackFields;
+  final TextEditingController durationController;
+  final TextEditingController costPriceController;
+
+  @override
+  Widget build(BuildContext context) {
+    final durationField = _InputField(
+      label: 'Duration (min)',
+      controller: durationController,
+      keyboardType: TextInputType.number,
+    );
+    final costField = _InputField(
+      label: 'Cost Price',
+      controller: costPriceController,
+      keyboardType: TextInputType.number,
+    );
+
+    if (stackFields) {
+      return Column(
+        children: [
+          durationField,
+          const SizedBox(height: 18),
+          costField,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: durationField),
+        const SizedBox(width: 28),
+        Expanded(child: costField),
+      ],
+    );
+  }
+}
+
+class _ServiceActionButtons extends StatelessWidget {
+  const _ServiceActionButtons({
+    required this.stackButtons,
+    required this.isSavingService,
+    required this.isDeletingService,
+    required this.onUpdateService,
+    required this.onDeleteService,
+  });
+
+  final bool stackButtons;
+  final bool isSavingService;
+  final bool isDeletingService;
+  final VoidCallback onUpdateService;
+  final VoidCallback onDeleteService;
+
+  @override
+  Widget build(BuildContext context) {
+    final updateButton = _ActionButton(
+      label: 'Update Service',
+      icon: Icons.sync_rounded,
+      color: const Color(0xFFF5C9B7),
+      onTap: isSavingService ? null : onUpdateService,
+    );
+    final deleteButton = _ActionButton(
+      label: 'Delete Service',
+      icon: Icons.delete_rounded,
+      color: const Color(0xFFE68888),
+      onTap: isDeletingService ? null : onDeleteService,
+    );
+
+    if (stackButtons) {
+      return Column(
+        children: [
+          updateButton,
+          const SizedBox(height: 12),
+          deleteButton,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: updateButton),
+        const SizedBox(width: 12),
+        Expanded(child: deleteButton),
+      ],
+    );
+  }
+}
+
 class _CategoryDropdown extends StatelessWidget {
-  const _CategoryDropdown({required this.label, required this.value, required this.onChanged});
+  const _CategoryDropdown(
+      {required this.label, required this.value, required this.onChanged});
 
   final String label;
   final String value;
@@ -325,17 +429,24 @@ class _CategoryDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF6C7078), fontSize: 14, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                color: Color(0xFF6C7078),
+                fontSize: 14,
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Container(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(border: Border.all(color: const Color(0xFFC9CED6)), borderRadius: BorderRadius.circular(6)),
+          decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFC9CED6)),
+              borderRadius: BorderRadius.circular(6)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF272A2F)),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF272A2F)),
               style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
               items: const [
                 DropdownMenuItem(value: 'Nail Care', child: Text('Nail Care')),
@@ -370,14 +481,20 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         height: 38,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+        decoration:
+            BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: Colors.white, size: 15),
             const SizedBox(width: 5),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text(label,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
       ),
