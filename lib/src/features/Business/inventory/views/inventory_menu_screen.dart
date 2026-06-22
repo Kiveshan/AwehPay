@@ -46,7 +46,7 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 420;
+            final isCompact = constraints.maxWidth < 340;
             final isLandscape = constraints.maxWidth > constraints.maxHeight;
             final horizontalPadding = isCompact ? 16.0 : 24.0;
             final sectionSpacing = isLandscape ? 18.0 : 32.0;
