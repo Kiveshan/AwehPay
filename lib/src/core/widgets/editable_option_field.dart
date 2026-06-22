@@ -24,6 +24,7 @@ class EditableOptionField extends StatefulWidget {
 
 class _EditableOptionFieldState extends State<EditableOptionField> {
   late final FocusNode _focusNode;
+  bool _showAll = false;
 
   @override
   void initState() {
@@ -63,6 +64,10 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                   return const Iterable<String>.empty();
                 }
 
+                if (_showAll) {
+                  return widget.options;
+                }
+
                 final query = textEditingValue.text.toLowerCase().trim();
 
                 if (query.isEmpty) {
@@ -100,6 +105,9 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                           controller: textEditingController,
                           focusNode: focusNode,
                           readOnly: widget.readOnly,
+                          onChanged: (_) {
+                            if (_showAll) setState(() => _showAll = false);
+                          },
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             contentPadding:
@@ -118,6 +126,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                           if (focusNode.hasFocus) {
                             focusNode.unfocus();
                           } else {
+                            setState(() => _showAll = true);
                             focusNode.requestFocus();
                           }
                         },
@@ -139,6 +148,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                   alignment: Alignment.topLeft,
                   child: Material(
                     elevation: 4,
+                    color: Colors.white,
                     child: SizedBox(
                       width: fieldWidth,
                       child: ListView.builder(
