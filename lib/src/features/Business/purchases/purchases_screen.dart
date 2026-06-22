@@ -12,6 +12,7 @@ class PurchaseItem {
   final String barcode;
   final String itemId;
   final String type; // 'product' or 'service'
+  int quantity;
 
   PurchaseItem({
     required this.name,
@@ -19,6 +20,7 @@ class PurchaseItem {
     this.barcode = '',
     this.itemId = '',
     this.type = 'product',
+    this.quantity = 1,
   });
 }
 
@@ -91,7 +93,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   void _addItem(PurchaseItem item) {
     setState(() {
-      _items.add(item);
+      final existingIndex = _items.indexWhere((i) => i.itemId == item.itemId && item.itemId.isNotEmpty);
+      if (existingIndex != -1) {
+        _items[existingIndex].quantity++;
+      } else {
+        _items.add(item);
+      }
       _searchController.clear();
       _showDropdown = false;
     });
@@ -103,10 +110,26 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     });
   }
 
+  void _incrementQuantity(int index) {
+    setState(() {
+      _items[index].quantity++;
+    });
+  }
+
+  void _decrementQuantity(int index) {
+    setState(() {
+      if (_items[index].quantity > 1) {
+        _items[index].quantity--;
+      } else {
+        _items.removeAt(index);
+      }
+    });
+  }
+
   double get _totalAmount {
     return _items.fold(0.0, (sum, item) {
       final priceValue = double.tryParse(item.price.replaceAll('R', '').replaceAll(',', '')) ?? 0.0;
-      return sum + priceValue;
+      return sum + (priceValue * item.quantity);
     });
   }
 
@@ -261,6 +284,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             else
               ...List.generate(_items.length, (index) {
                 final item = _items[index];
+                final unitPrice =
+                    double.tryParse(item.price.replaceAll('R', '').replaceAll(',', '')) ?? 0.0;
+                final lineTotal = unitPrice * item.quantity;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Row(
@@ -280,7 +306,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              item.barcode,
+                              item.barcode.isNotEmpty ? item.barcode : item.price,
                               style: const TextStyle(
                                 color: Color(0xFF9B9B9B),
                                 fontSize: 12,
@@ -289,8 +315,48 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                           ],
                         ),
                       ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2F2F2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () => _decrementQuantity(index),
+                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                              child: const Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(Icons.remove, color: Color(0xFF272A2F), size: 16),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 24,
+                              child: Text(
+                                '${item.quantity}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF272A2F),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => _incrementQuantity(index),
+                              borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                              child: const Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(Icons.add, color: Color(0xFF272A2F), size: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Text(
-                        item.price,
+                        'R${lineTotal % 1 == 0 ? lineTotal.toInt() : lineTotal.toStringAsFixed(2)}',
                         style: const TextStyle(
                           color: Color(0xFF272A2F),
                           fontSize: 16,
