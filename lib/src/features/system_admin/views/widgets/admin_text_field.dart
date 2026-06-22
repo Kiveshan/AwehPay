@@ -34,6 +34,7 @@ class AdminTextField extends StatelessWidget {
       maxLines: maxLines,
       keyboardType: keyboardType,
       readOnly: readOnly,
+      style: const TextStyle(color: Colors.black),
       decoration: InputDecoration(
         labelText: alignLabelAbove ? null : label,
         hintText: hintText,
