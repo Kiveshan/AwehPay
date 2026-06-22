@@ -745,6 +745,54 @@ class ApiService {
     return _decodeResponse(response);
   }
 
+  Future<List<Map<String, dynamic>>> listBanks() async {
+    final response = await _client.get(_uri('/payments/banks'));
+    final body = _decodeResponse(response);
+    final banks = body['banks'] as List<dynamic>? ?? [];
+
+    return banks.map((bank) => Map<String, dynamic>.from(bank as Map)).toList();
+  }
+
+  Future<String?> resolveAccountName({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    final response = await _client.get(
+      _uri('/payments/resolve-account?accountNumber=$accountNumber&bankCode=$bankCode'),
+    );
+    final body = _decodeResponse(response);
+    return body['accountName'] as String?;
+  }
+
+  Future<Map<String, dynamic>> createPaystackSubaccount({
+    required String businessId,
+    required String bankAccountId,
+    required String businessName,
+    required String bankCode,
+    required String accountNumber,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/payments/subaccount'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({
+        'businessId': businessId,
+        'bankAccountId': bankAccountId,
+        'businessName': businessName,
+        'bankCode': bankCode,
+        'accountNumber': accountNumber,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Map<String, dynamic> _decodeResponse(http.Response response) {
     final body = response.body.isEmpty
         ? <String, dynamic>{}

@@ -19,7 +19,7 @@ class QRPaymentRejectedScreen extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onChangeMethod;
 
-  double get _tax => totalAmount * 0.10;
+  double get _tax => totalAmount * 0.15;
 
   @override
   Widget build(BuildContext context) {
@@ -60,23 +60,30 @@ class QRPaymentRejectedScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  ...items.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: const TextStyle(
-                                      color: Color(0xFF272A2F),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                  ...items.map((item) {
+                    final unitPrice = double.tryParse(
+                          item.price.replaceAll('R', '').replaceAll(',', ''),
+                        ) ??
+                        0.0;
+                    final lineTotal = unitPrice * item.quantity;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${item.name} x${item.quantity}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF272A2F),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                ),
+                                if (item.barcode.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     item.barcode,
@@ -86,19 +93,21 @@ class QRPaymentRejectedScreen extends StatelessWidget {
                                     ),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
-                            Text(
-                              item.price,
-                              style: const TextStyle(
-                                color: Color(0xFF272A2F),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          ),
+                          Text(
+                            'R${lineTotal % 1 == 0 ? lineTotal.toInt() : lineTotal.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Color(0xFF272A2F),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ],
-                        ),
-                      )),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 20),
                   _buildSummaryBox(),
                 ],
@@ -148,7 +157,7 @@ class QRPaymentRejectedScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SummaryRow(
-            label: 'Tax (10%)',
+            label: 'Tax (15%)',
             value: 'R${_tax.toStringAsFixed(2)}',
             bold: true,
           ),
