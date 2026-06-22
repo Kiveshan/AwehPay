@@ -46,7 +46,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
         Text(
           widget.label,
           style: const TextStyle(
-            color: Color(0xFF6C7078),
+            color: Color(0xFF272A2F),
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -160,7 +160,13 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
 
                           return ListTile(
                             dense: true,
-                            title: Text(option),
+                            title: Text(
+                              option,
+                              style: const TextStyle(
+                                color: Color(0xFF272A2F),
+                                fontSize: 14,
+                              ),
+                            ),
                             onTap: () {
                               onSelected(option);
                               widget.onOptionSelected?.call(option);

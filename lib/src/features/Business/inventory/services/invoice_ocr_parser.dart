@@ -136,7 +136,9 @@ class InvoiceOcrParser {
       // Collect ALL money values in the row — needed for table-format detection.
       var allPrices = _extractAllMoneyValues(rowText);
 
-      // Orphan recovery pass A: no price here, check if next row is price-only.
+      // Orphan recovery pass A: no price here, check if next row is price-only
+      // OR has a leading QTY integer followed by prices (e.g. "5 15.00 75.00").
+      int? orphanQty;
       if (allPrices.isEmpty && i + 1 < rows.length && !consumed.contains(i + 1)) {
         final nextText = rows[i + 1].text;
         if (!_isSummaryRow(nextText)) {
@@ -145,6 +147,14 @@ class InvoiceOcrParser {
           if (nextPrices.isNotEmpty && nextResidue.isEmpty) {
             allPrices = nextPrices;
             consumed.add(i + 1);
+          } else if (nextPrices.isNotEmpty && RegExp(r'^\d+$').hasMatch(nextResidue)) {
+            // Next row is "QTY UNIT_PRICE LINE_TOTAL" — capture all three.
+            final qtyVal = int.tryParse(nextResidue);
+            if (qtyVal != null && qtyVal >= 1 && qtyVal <= 9999) {
+              allPrices = nextPrices;
+              orphanQty = qtyVal;
+              consumed.add(i + 1);
+            }
           }
         }
       }
@@ -152,11 +162,37 @@ class InvoiceOcrParser {
       if (allPrices.isEmpty) continue;
 
       // Always use the LAST money value as the cost price (line total on
-      // structured invoices) and read the qty directly from the row text —
-      // no calculations or math validation.
+      // structured invoices).
       final namePortion = _removeMoneyValues(rowText);
-      final price = allPrices.last;
-      final tableQty = _extractTableQuantity(namePortion);
+      var price = allPrices.last;
+
+      // When two prices are present (unit price + line total), derive qty from
+      // their ratio. OCR frequently misses or garbles the narrow QTY column,
+      // and product names often contain numbers ("43 inch", "6 Way Plug") that
+      // would be incorrectly extracted as qty by text scanning.
+      int? calculatedQty;
+      if (allPrices.length >= 2) {
+        final unitPrice = allPrices[allPrices.length - 2];
+        final lineTotal = allPrices.last;
+        if (unitPrice > 0) {
+          if (lineTotal < unitPrice * 0.9) {
+            // Line total is lower than the unit price — impossible for qty≥1,
+            // so the line total column was OCR-corrupted (e.g. "R4,999.99"
+            // partially read as "R4.99"). Fall back to unit price, qty=1.
+            price = unitPrice;
+            calculatedQty = 1;
+          } else {
+            final ratio = lineTotal / unitPrice;
+            final rounded = ratio.round();
+            if (rounded >= 1 &&
+                rounded <= 999 &&
+                (ratio - rounded).abs() / rounded < 0.02) {
+              calculatedQty = rounded;
+            }
+          }
+        }
+      }
+      final tableQty = orphanQty ?? calculatedQty ?? _extractTableQuantity(namePortion);
 
       // Apply ignore checks only to the name portion (not full row text) to
       // avoid rejecting products whose reference column has stray keywords.
@@ -169,7 +205,7 @@ class InvoiceOcrParser {
       if (tableQty != null) {
         name = name
             .replaceFirst(
-              RegExp('(?<![A-Za-z0-9\\-/])$tableQty(?![A-Za-z.,/\\-])'),
+              RegExp('(?<![A-Za-z0-9\\-/])$tableQty(?![A-Za-z0-9.,/\\-])'),
               ' ',
             )
             .replaceAll(RegExp(r'\s+'), ' ')
@@ -245,7 +281,7 @@ class InvoiceOcrParser {
   /// Returns every parseable money value found in [text], in left-to-right order.
   List<double> _extractAllMoneyValues(String text) {
     return RegExp(
-      r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
+      r'R\s*\d{1,3}[.,]\d{3}[.,]\d{2}|R\s*\d+[.,]\d[oO]\b|R\s*\d{2,3}\s\d{2}\b|R\s*\d{1,3}(?:,\d{3})+\.\d{2}|R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
       caseSensitive: false,
     )
         .allMatches(text)
@@ -335,26 +371,42 @@ class InvoiceOcrParser {
         RegExp(r'\bprice\b').hasMatch(v);
   }
 
-  // Normalises an SA price string (e.g. "R 2 625,00") to a parseable double.
+  // Normalises an SA price string to a parseable double.
   double? _parseSaPrice(String raw) {
-    // Remove currency symbol and leading/trailing space.
     var s = raw.replaceAll(RegExp(r'^R\s*', caseSensitive: false), '').trim();
-    // If comma is the decimal separator (SA style: "2 625,00"), swap it to dot
-    // and strip the thousands space.
+    // OCR reads "R 4,999.99" as "R4.999.99" — period used for both separators.
+    // Strip the first separator (thousands) to get "4999.99".
+    if (RegExp(r'^\d{1,3}[.,]\d{3}[.,]\d{2}$').hasMatch(s)) {
+      final firstSep = s.indexOf(RegExp(r'[.,]'));
+      s = s.substring(0, firstSep) + s.substring(firstSep + 1);
+      return double.tryParse(s.replaceAll(',', '.'));
+    }
+    // OCR misreads "0" as "o"/"O" at end of decimal: "399.0o" → "399.00".
+    s = s.replaceAllMapped(
+      RegExp(r'([.,]\d)[oO]$'),
+      (m) => '${m.group(1)}0',
+    );
+    // Space as decimal separator (2-3 digit integer part only, to avoid
+    // confusion with space-thousands format): "699 98" → 699.98.
+    if (RegExp(r'^\d{2,3}\s\d{2}$').hasMatch(s)) {
+      return double.tryParse(s.replaceFirst(' ', '.'));
+    }
+    // Comma-thousands, dot-decimal: "4,999.99"
+    if (RegExp(r'^\d{1,3}(?:,\d{3})+\.\d{2}$').hasMatch(s)) {
+      return double.tryParse(s.replaceAll(',', ''));
+    }
+    // Space-thousands, comma-decimal: "2 625,00"
     if (RegExp(r'\d,\d{2}$').hasMatch(s)) {
       s = s.replaceAll(' ', '').replaceAll(',', '.');
     } else {
-      // Otherwise treat comma as thousands separator ("2,625.00") – just drop it.
       s = s.replaceAll(',', '').replaceAll(' ', '');
     }
     return double.tryParse(s);
   }
 
   double? _extractLastMoneyValue(String text) {
-    // Match SA price: optional R, then digits with optional space-thousands
-    // separator, then a comma or dot followed by exactly 2 decimal digits.
     final matches = RegExp(
-      r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
+      r'R\s*\d{1,3}[.,]\d{3}[.,]\d{2}|R\s*\d+[.,]\d[oO]\b|R\s*\d{2,3}\s\d{2}\b|R\s*\d{1,3}(?:,\d{3})+\.\d{2}|R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
       caseSensitive: false,
     ).allMatches(text).toList();
 
@@ -369,7 +421,7 @@ class InvoiceOcrParser {
     return text
         .replaceAll(
           RegExp(
-            r'R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}(?:\s*ZAR)?',
+            r'R\s*\d{1,3}[.,]\d{3}[.,]\d{2}|R\s*\d+[.,]\d[oO]\b|R\s*\d{2,3}\s\d{2}\b|R\s*\d{1,3}(?:,\d{3})+\.\d{2}|R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}(?:\s*ZAR)?|R\s*\d{1,3}[.,]\d{3}\b',
             caseSensitive: false,
           ),
           ' ',
@@ -668,16 +720,12 @@ class InvoiceOcrParser {
 
     if (tableMatch != null) {
       final quantity = int.parse(tableMatch.group(2)!);
-      final unitPrice = double.parse(tableMatch.group(3)!);
       final lineTotal = double.parse(tableMatch.group(4)!);
-      final costPrice = (lineTotal / quantity - unitPrice).abs() < 0.05
-          ? unitPrice
-          : lineTotal / quantity;
 
       return _buildProduct(
         name: tableMatch.group(1)!,
         quantity: quantity,
-        costPrice: costPrice,
+        costPrice: lineTotal,
         confidence: 0.8,
       );
     }
@@ -697,15 +745,18 @@ class InvoiceOcrParser {
     }
 
     final simpleMatch = RegExp(
-      r'^(.+?)\s+(\d+)\s+R?\s*(\d+(?:\.\d{1,2})?)(?:\s+R?\s*\d+(?:\.\d{1,2})?)?$',
+      r'^(.+?)\s+(\d+)\s+R?\s*(\d+(?:\.\d{1,2})?)(?:\s+R?\s*(\d+(?:\.\d{1,2})?))?$',
       caseSensitive: false,
     ).firstMatch(normalized);
 
     if (simpleMatch != null) {
+      final unitPrice = double.parse(simpleMatch.group(3)!);
+      final lineTotalStr = simpleMatch.group(4);
+      final costPrice = lineTotalStr != null ? double.parse(lineTotalStr) : unitPrice;
       return _buildProduct(
         name: simpleMatch.group(1)!,
         quantity: int.parse(simpleMatch.group(2)!),
-        costPrice: double.parse(simpleMatch.group(3)!),
+        costPrice: costPrice,
         confidence: 0.75,
       );
     }
@@ -811,8 +862,16 @@ class InvoiceOcrParser {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
-    // Strip a leading line-number prefix (e.g. "1 MSMU4243999" → "MSMU4243999").
-    cleanedName = cleanedName.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
+    // Strip leading digit-only tokens and OCR-corrupted barcodes.
+    // Pure-digit groups handle split barcodes ("600970 1234567 ").
+    // The 8+ char pattern handles barcodes where OCR swapped digits for similar
+    // letters: B→8, g/q→9, O/o→0, S→5, Z→2, l/I→1.
+    cleanedName = cleanedName
+        .replaceFirst(
+          RegExp(r'^(?:[0-9BOoSZzlIgq]{8,}\s+|\d+\s+)+', caseSensitive: false),
+          '',
+        )
+        .trim();
 
     // Strip leading or trailing SKU / code column like "SKU-1001", "PROD-A12".
     // Pattern: 1-6 letters, hyphen, 1-10 alphanumeric chars.

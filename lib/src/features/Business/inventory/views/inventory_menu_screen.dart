@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:awe_pay/src/core/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,11 +17,35 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
   String _selectedType = 'Product';
   final _apiService = ApiService();
   int? _lowStockCount;
+  DateTime? _lastUpdatedAt;
+  Timer? _tickTimer;
 
   @override
   void initState() {
     super.initState();
     _loadLowStockCount();
+    // Rebuild every 30 s so the relative-time label stays current.
+    _tickTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tickTimer?.cancel();
+    super.dispose();
+  }
+
+  String _formatAge() {
+    if (_lastUpdatedAt == null) return 'updating…';
+    final diff = DateTime.now().difference(_lastUpdatedAt!);
+    if (diff.inSeconds < 60) return 'updated just now';
+    if (diff.inMinutes < 60) {
+      final m = diff.inMinutes;
+      return 'updated $m min${m == 1 ? '' : 's'} ago';
+    }
+    final h = diff.inHours;
+    return 'updated $h hr${h == 1 ? '' : 's'} ago';
   }
 
   Future<void> _loadLowStockCount() async {
@@ -32,7 +58,10 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
           final threshold = ((p['lowStockThreshold'] as num?) ?? 0).toInt();
           return qty <= threshold;
         }).length;
-        if (mounted) setState(() => _lowStockCount = count);
+        if (mounted) setState(() {
+          _lowStockCount = count;
+          _lastUpdatedAt = DateTime.now();
+        });
       }
     } catch (_) {
       if (mounted) setState(() => _lowStockCount = 0);
@@ -105,6 +134,19 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                             if (mounted) _loadLowStockCount();
                           },
                         ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _InventoryActionButton(
+                          icon: Icons.list_rounded,
+                          label: _selectedType == 'Product' ? 'Product List' : 'Service List',
+                          subtitle: _formatAge(),
+                          onTap: () async {
+                            await context.push(_selectedType == 'Product' ? AppRoutes.productList : AppRoutes.serviceList);
+                            if (mounted) _loadLowStockCount();
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
