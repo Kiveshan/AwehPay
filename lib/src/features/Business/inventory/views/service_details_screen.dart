@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/services/api_service.dart';
+import '../inventory_timestamp.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   const ServiceDetailsScreen({
@@ -168,6 +169,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         return;
       }
 
+      InventoryTimestamp.markChanged();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Service updated successfully')),
       );
@@ -204,6 +206,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         return;
       }
 
+      InventoryTimestamp.markChanged();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Service deleted successfully')),
       );

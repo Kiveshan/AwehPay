@@ -2,6 +2,8 @@ import 'package:awe_pay/src/core/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../inventory_timestamp.dart';
+
 class AddServiceScreen extends StatefulWidget {
   const AddServiceScreen({super.key});
 
@@ -163,6 +165,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
         return;
       }
 
+      InventoryTimestamp.markChanged();
       setState(() {
         _isServiceAdded = true;
       });
