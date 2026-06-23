@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:awe_pay/src/core/services/api_service.dart';
 import 'package:awe_pay/src/core/router/app_routes.dart';
 import 'package:awe_pay/src/features/Business/Inventory/models/scanned_product.dart';
@@ -10,6 +12,8 @@ import '../../../../core/widgets/scan_barcode_button.dart';
 import '../../../../core/widgets/scan_type_bottom_sheet.dart';
 import '../../../../core/widgets/invoice_source_bottom_sheet.dart';
 
+import '../services/invoice_ocr_parser.dart';
+import '../inventory_timestamp.dart';
 import '../services/invoice_scan_service.dart';
 import 'widgets/add_product_form.dart';
 
@@ -44,6 +48,7 @@ class AddProductScreen extends StatefulWidget {
 class _AddProductScreenState extends State<AddProductScreen> {
   bool _isProductAdded = false;
   bool _isSavingProduct = false;
+  bool _isProcessingInvoice = false;
   final _apiService = ApiService();
   final _invoiceScanService = InvoiceScanService();
   late final TextEditingController _productNameController;
@@ -57,6 +62,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _quantityModified = false;
   bool _productNameLockedBySelection = false;
   String? _selectedProductId;
+  String? _selectedCategory;
   List<String> _productOptions = [];
   List<String> _categoryOptions = ['Other'];
   final Map<String, Map<String, dynamic>> _productDataByName = {};
@@ -67,9 +73,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _productNameController = TextEditingController(
       text: widget.lockedProductName ?? '',
     );
-    _categoryController = TextEditingController(
-      text: widget.lockedCategory ?? '',
-    );
+    _categoryController = TextEditingController();
+    if (widget.lockedCategory != null && widget.lockedCategory!.isNotEmpty) {
+      _selectedCategory = widget.lockedCategory;
+    }
     final hasPrefillBarcode =
         widget.prefillBarcode != null && widget.prefillBarcode!.isNotEmpty;
     _barcodeController = TextEditingController(
@@ -107,6 +114,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           setState(() {
             _productNameLockedBySelection = false;
             _selectedProductId = null;
+            _selectedCategory = null;
             _categoryController.clear();
             _costPriceController.clear();
             _sellingPriceController.clear();
@@ -147,70 +155,90 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AddProductHeader(),
-              const SizedBox(height: 32),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (!_isProductAdded) ...[
-                        Center(
-                          child: ScanBarcodeButton(
-                            onTap: _showScanOptions,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AddProductHeader(),
+                  const SizedBox(height: 32),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!_isProductAdded) ...[
+                            Center(
+                              child: ScanBarcodeButton(
+                                onTap: _showScanOptions,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                          ],
+                          AddProductForm(
+                            isProductAdded: _isProductAdded,
+                            isSavingProduct: _isSavingProduct,
+                            hasScannedBarcode: _hasScannedBarcode,
+                            lockedProductName: widget.lockedProductName,
+                            lockedCategory: widget.lockedCategory,
+                            productOptions: _productOptions,
+                            categoryOptions: _categoryOptions,
+                            selectedCategory: _selectedCategory,
+                            onCategoryChanged: (value) {
+                              setState(() {
+                                _selectedCategory = value;
+                                if (value != 'Other') {
+                                  _categoryController.clear();
+                                }
+                              });
+                            },
+                            productNameController: _productNameController,
+                            categoryController: _categoryController,
+                            barcodeController: _barcodeController,
+                            costPriceController: _costPriceController,
+                            sellingPriceController: _sellingPriceController,
+                            quantityController: _quantityController,
+                            alertQuantityController: _alertQuantityController,
+                            onProductOptionSelected: (name) {
+                              final data = _productDataByName[name];
+                              if (data != null) {
+                                _fillFromProductMap(data, lockSelection: true);
+                              } else {
+                                setState(() {
+                                  _selectedProductId = null;
+                                  _productNameLockedBySelection = false;
+                                });
+                              }
+                            },
+                            onIncrementQuantity: () =>
+                                _changeIntField(_quantityController, 1),
+                            onDecrementQuantity: () =>
+                                _changeIntField(_quantityController, -1),
+                            onIncrementAlertQuantity: () =>
+                                _changeIntField(_alertQuantityController, 1),
+                            onDecrementAlertQuantity: () =>
+                                _changeIntField(_alertQuantityController, -1),
+                            onSave: _saveProduct,
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                      AddProductForm(
-                        isProductAdded: _isProductAdded,
-                        isSavingProduct: _isSavingProduct,
-                        hasScannedBarcode: _hasScannedBarcode,
-                        lockedProductName: widget.lockedProductName,
-                        lockedCategory: widget.lockedCategory,
-                        productOptions: _productOptions,
-                        categoryOptions: _categoryOptions,
-                        productNameController: _productNameController,
-                        categoryController: _categoryController,
-                        barcodeController: _barcodeController,
-                        costPriceController: _costPriceController,
-                        sellingPriceController: _sellingPriceController,
-                        quantityController: _quantityController,
-                        alertQuantityController: _alertQuantityController,
-                        onProductOptionSelected: (name) {
-                          final data = _productDataByName[name];
-                          if (data != null) {
-                            _fillFromProductMap(data, lockSelection: true);
-                          } else {
-                            setState(() {
-                              _selectedProductId = null;
-                              _productNameLockedBySelection = false;
-                            });
-                          }
-                        },
-                        onIncrementQuantity: () =>
-                            _changeIntField(_quantityController, 1),
-                        onDecrementQuantity: () =>
-                            _changeIntField(_quantityController, -1),
-                        onIncrementAlertQuantity: () =>
-                            _changeIntField(_alertQuantityController, 1),
-                        onDecrementAlertQuantity: () =>
-                            _changeIntField(_alertQuantityController, -1),
-                        onSave: _saveProduct,
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          if (_isProcessingInvoice)
+            Container(
+              color: Colors.white,
+              child: const Center(
+                child: _ProcessingInvoiceOverlay(),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -274,6 +302,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           setState(() {
             _selectedProductId = null;
             _productNameLockedBySelection = false;
+            _selectedCategory = null;
             _hasScannedBarcode = true;
             _barcodeController.text = barcode.trim();
             _productNameController.clear();
@@ -293,7 +322,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _handleInvoiceScan() async {
-    final source = await showModalBottomSheet<InvoiceImageSource>(
+    InvoiceImageSource? source;
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -302,11 +332,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
       builder: (context) {
         return InvoiceSourceBottomSheet(
           onSelect: (choice) {
-            Navigator.of(context).pop(
-              choice == InvoiceSourceChoice.camera
-                  ? InvoiceImageSource.camera
-                  : InvoiceImageSource.gallery,
-            );
+            source = choice == InvoiceSourceChoice.camera
+                ? InvoiceImageSource.camera
+                : InvoiceImageSource.file;
+            Navigator.of(context).pop();
           },
         );
       },
@@ -318,21 +347,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     setState(() {
       _isSavingProduct = true;
+      _isProcessingInvoice = true;
     });
 
     try {
-      final image = await _invoiceScanService.pickInvoiceImage(source: source);
-      if (image == null) {
+      final filePath = await _invoiceScanService.pickInvoiceFilePath(source: source!);
+      if (filePath == null) {
         return;
       }
 
-      final rawOcrText = await _invoiceScanService.recognizeTextFromFilePath(
-        image.path,
+      final recognizedText = await _invoiceScanService.recognizeFromFilePath(
+        filePath,
       );
 
-      final response = await _apiService.matchScannedProductsFromRawText(
-        rawOcrText: rawOcrText,
+      debugPrint('=== RAW OCR TEXT ===');
+      debugPrint(recognizedText.text);
+      debugPrint('====================');
+
+      final parser = InvoiceOcrParser();
+      final parsed = parser.parseRecognizedText(recognizedText);
+
+      debugPrint('=== PARSED PRODUCTS (${parsed.products.length}) ===');
+      for (var i = 0; i < parsed.products.length; i++) {
+        final p = parsed.products[i];
+        debugPrint(
+          '[${i + 1}] name="${p.name}"  qty=${p.quantity}  costPrice=${p.costPrice.toStringAsFixed(2)}  confidence=${p.confidence.toStringAsFixed(2)}',
+        );
+      }
+      debugPrint('====================================================');
+
+      if (parsed.products.isEmpty) {
+        _showError('No readable invoice items were found. Please retry scanning.');
+        return;
+      }
+
+      final response = await _apiService.matchScannedProducts(
+        products: parsed.products
+            .map((p) => p.toJson())
+            .toList(),
       );
+
       final rawProducts = response['products'];
       final matchedProducts = rawProducts is List
           ? rawProducts
@@ -351,9 +405,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         AppRoutes.reviewScannedProducts,
         extra: ReviewScannedProductsArgs(
           products: matchedProducts,
-          rawOcrText: rawOcrText,
-          supplierName: (response['supplierName'] as String?) ?? '',
-          invoiceNumber: (response['invoiceNumber'] as String?) ?? '',
+          rawOcrText: recognizedText.text,
+          supplierName: parsed.supplierName,
+          invoiceNumber: parsed.invoiceNumber,
         ),
       );
     } catch (error) {
@@ -364,6 +418,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (mounted) {
         setState(() {
           _isSavingProduct = false;
+          _isProcessingInvoice = false;
         });
       }
     }
@@ -382,7 +437,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _productNameLockedBySelection = lockSelection;
       _hasScannedBarcode = true;
       _productNameController.text = (product['name'] as String?) ?? '';
-      _categoryController.text = (product['category'] as String?) ?? '';
+      final productCategory = (product['category'] as String?) ?? '';
+      if (productCategory.isNotEmpty && _categoryOptions.contains(productCategory)) {
+        _selectedCategory = productCategory;
+        _categoryController.clear();
+      } else if (productCategory.isNotEmpty) {
+        _selectedCategory = 'Other';
+        _categoryController.text = productCategory;
+      } else {
+        _selectedCategory = null;
+        _categoryController.clear();
+      }
       _barcodeController.text = (product['barcode'] as String?) ?? '';
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
@@ -405,7 +470,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _saveProduct() async {
     final name = _productNameController.text.trim();
-    final category = _categoryController.text.trim();
+    final category = _selectedCategory == 'Other'
+        ? _categoryController.text.trim()
+        : (_selectedCategory ?? '');
     final costPrice = _parseMoney(_costPriceController.text);
     final sellingPrice = _parseMoney(_sellingPriceController.text);
     final stockQuantity = int.tryParse(_quantityController.text.trim());
@@ -451,6 +518,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       if (!mounted) return;
+      InventoryTimestamp.markChanged();
       if (_selectedProductId != null) {
         context.pop();
       } else {
@@ -522,4 +590,97 @@ class _AddProductScreenState extends State<AddProductScreen> {
       SnackBar(content: Text(message)),
     );
   }
+}
+
+class _ProcessingInvoiceOverlay extends StatefulWidget {
+  const _ProcessingInvoiceOverlay();
+
+  @override
+  State<_ProcessingInvoiceOverlay> createState() =>
+      _ProcessingInvoiceOverlayState();
+}
+
+class _ProcessingInvoiceOverlayState extends State<_ProcessingInvoiceOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 72,
+          height: 72,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: _DotCirclePainter(progress: _controller.value),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Processing Invoice',
+          style: TextStyle(
+            color: Color(0xFF272A2F),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DotCirclePainter extends CustomPainter {
+  const _DotCirclePainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dotCount = 12;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 6;
+    const dotRadius = 4.0;
+
+    for (int i = 0; i < dotCount; i++) {
+      final angle = (i / dotCount) * 2 * math.pi;
+      final offset = Offset(
+        center.dx + radius * math.cos(angle - math.pi / 2),
+        center.dy + radius * math.sin(angle - math.pi / 2),
+      );
+      final distFromActive = ((i / dotCount) - progress + 1) % 1;
+      final opacity = (1 - distFromActive).clamp(0.15, 1.0);
+      canvas.drawCircle(
+        offset,
+        dotRadius,
+        Paint()
+          ..color =
+              const Color(0xFFB8A9E8).withValues(alpha: opacity),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotCirclePainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }

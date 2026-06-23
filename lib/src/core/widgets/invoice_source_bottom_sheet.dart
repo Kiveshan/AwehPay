@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'scan_option_tile.dart';
 
-enum InvoiceSourceChoice { camera, gallery }
+enum InvoiceSourceChoice { camera, file }
 
 class InvoiceSourceBottomSheet extends StatelessWidget {
   const InvoiceSourceBottomSheet({
@@ -27,10 +27,10 @@ class InvoiceSourceBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ScanOptionTile(
-            icon: Icons.photo_library_rounded,
-            title: 'Select Invoice Image',
-            subtitle: 'Choose an existing image',
-            onTap: () => onSelect(InvoiceSourceChoice.gallery),
+            icon: Icons.upload_file_rounded,
+            title: 'Upload Document',
+            subtitle: 'Select a PDF or image from your device',
+            onTap: () => onSelect(InvoiceSourceChoice.file),
           ),
         ],
       ),

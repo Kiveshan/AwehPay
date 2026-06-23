@@ -1,0 +1,46 @@
+name: Deploy backend to Elastic Beanstalk
+
+# Deploys the Node/Express backend (the backend/ folder only) to Elastic Beanstalk
+# whenever backend code lands on main.
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yaml'
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eb-deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build deployment bundle (backend/ only)
+        run: |
+          cd backend
+          zip -r "../awehpay-backend-${GITHUB_SHA}.zip" . \
+            -x '*.git*' \
+            -x 'node_modules/*' \
+            -x '*.env' \
+            -x '*adminsdk*.json'
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: ${{ secrets.AWS_REGION }}
+          application_name: ${{ secrets.EB_APPLICATION_NAME }}
+          environment_name: ${{ secrets.EB_ENVIRONMENT_NAME }}
+          version_label: ${{ github.sha }}
+          deployment_package: awehpay-backend-${{ github.sha }}.zip
+          wait_for_environment_recovery: 200

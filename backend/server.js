@@ -5,7 +5,58 @@ const admin = require('firebase-admin');
 
 dotenv.config();
 
-const serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+// Load Firebase service-account credentials.
+// - Cloud (Elastic Beanstalk): PREFER FIREBASE_SERVICE_ACCOUNT_B64 — the base64 of the
+//   JSON key file. base64 has no newlines/quotes, so the private key survives EB
+//   environment-property transport intact. FIREBASE_SERVICE_ACCOUNT (raw JSON) also works
+//   but can corrupt the PEM newlines depending on how it's set.
+// - Local dev: GOOGLE_APPLICATION_CREDENTIALS points at the JSON key file on disk.
+function loadServiceAccount() {
+  let serviceAccount;
+
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+    const json = Buffer.from(
+      process.env.FIREBASE_SERVICE_ACCOUNT_B64,
+      'base64'
+    ).toString('utf8');
+    try {
+      serviceAccount = JSON.parse(json);
+    } catch (err) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_B64 did not decode to valid JSON: ${err.message}`
+      );
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (err) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON: ${err.message}`
+      );
+    }
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  } else {
+    throw new Error(
+      'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT_B64 (base64 JSON, ' +
+        'preferred for cloud/Beanstalk) or GOOGLE_APPLICATION_CREDENTIALS (file path, ' +
+        'for local dev).'
+    );
+  }
+
+  // Safety net: if the private key arrived with escaped "\n" literals instead of real
+  // newlines, restore them so node-forge can parse the PEM.
+  if (
+    serviceAccount.private_key &&
+    serviceAccount.private_key.includes('\\n')
+  ) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+  }
+
+  return serviceAccount;
+}
+
+const serviceAccount = loadServiceAccount();
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -29,6 +80,8 @@ const salesTrackingBackend = require('./business/Sales_tracking/sales_tracking_b
 const salesTrackingQueries = require('./business/Sales_tracking/sales_tracking_queries');
 const adminBusinessBackend = require('./admin/admin_business_backend');
 const adminAnalyticsBackend = require('./admin/analytics_backend');
+const paystackBanks = require('./payments/paystack_banks');
+const createSubaccount = require('./payments/create_subaccount');
 
 const app = express();
 
@@ -55,6 +108,8 @@ app.use('/inventory/product', reviewScannedProductsBackend);
 app.use('/inventory/product', productDetailsBackend);
 app.use('/admin/businesses', adminBusinessBackend);
 app.use('/admin/analytics', adminAnalyticsBackend);
+app.use('/payments', paystackBanks);
+app.use('/payments', createSubaccount);
 
 const db = admin.firestore();
 const auth = admin.auth();

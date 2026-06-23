@@ -102,6 +102,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
       }
 
       context.go(AppRoutes.businessHome);
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (error.code == 'invalid-credential' ||
+            error.code == 'wrong-password' ||
+            error.code == 'user-not-found') {
+          _errorMessage = 'wrong email or password';
+        } else {
+          _errorMessage =
+              error.message ?? 'An error occurred. Please try again.';
+        }
+      });
     } catch (error) {
       if (!mounted) {
         return;

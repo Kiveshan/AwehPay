@@ -24,6 +24,7 @@ class EditableOptionField extends StatefulWidget {
 
 class _EditableOptionFieldState extends State<EditableOptionField> {
   late final FocusNode _focusNode;
+  bool _showAll = false;
 
   @override
   void initState() {
@@ -45,7 +46,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
         Text(
           widget.label,
           style: const TextStyle(
-            color: Color(0xFF6C7078),
+            color: Color(0xFF272A2F),
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -61,6 +62,10 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
               optionsBuilder: (textEditingValue) {
                 if (widget.readOnly) {
                   return const Iterable<String>.empty();
+                }
+
+                if (_showAll) {
+                  return widget.options;
                 }
 
                 final query = textEditingValue.text.toLowerCase().trim();
@@ -100,6 +105,9 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                           controller: textEditingController,
                           focusNode: focusNode,
                           readOnly: widget.readOnly,
+                          onChanged: (_) {
+                            if (_showAll) setState(() => _showAll = false);
+                          },
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             contentPadding:
@@ -118,6 +126,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                           if (focusNode.hasFocus) {
                             focusNode.unfocus();
                           } else {
+                            setState(() => _showAll = true);
                             focusNode.requestFocus();
                           }
                         },
@@ -139,6 +148,7 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
                   alignment: Alignment.topLeft,
                   child: Material(
                     elevation: 4,
+                    color: Colors.white,
                     child: SizedBox(
                       width: fieldWidth,
                       child: ListView.builder(
@@ -150,7 +160,13 @@ class _EditableOptionFieldState extends State<EditableOptionField> {
 
                           return ListTile(
                             dense: true,
-                            title: Text(option),
+                            title: Text(
+                              option,
+                              style: const TextStyle(
+                                color: Color(0xFF272A2F),
+                                fontSize: 14,
+                              ),
+                            ),
                             onTap: () {
                               onSelected(option);
                               widget.onOptionSelected?.call(option);

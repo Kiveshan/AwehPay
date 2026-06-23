@@ -61,78 +61,110 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _Header(title: 'Service List'),
-              const SizedBox(height: 28),
-              _SearchBar(
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'Categories',
-                style: TextStyle(color: Color(0xFF272A2F), fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 18),
-              _CategoryTabs(
-                categories: _categories,
-                selectedCategory: _selectedCategory,
-                onCategorySelected: (category) {
-                  setState(() {
-                    _selectedCategory = category;
-                  });
-                },
-              ),
-              const SizedBox(height: 18),
-              Center(
-                child: _PageIndicator(
-                  itemCount: _categories.length,
-                  selectedIndex: _categories.indexOf(_selectedCategory).clamp(0, _categories.length - 1),
-                ),
-              ),
-              const SizedBox(height: 26),
-              Expanded(
-                child: _isLoadingServices
-                    ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
-                        ? Center(
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Color(0xFF6C7078), fontSize: 14),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : filteredServices.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No services found',
-                          style: TextStyle(color: Color(0xFF6C7078), fontSize: 14),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.only(right: 8),
-                        itemCount: filteredServices.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 18),
-                        itemBuilder: (context, index) {
-                          final service = filteredServices[index];
-                          return _ServiceCard(
-                            service: service,
-                            onTap: () async {
-                              await context.push(AppRoutes.serviceDetails, extra: service.toDetailsExtra());
-                              if (mounted) {
-                                _loadServices();
-                              }
-                            },
-                          );
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 420;
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
+            final horizontalPadding = isCompact ? 16.0 : 24.0;
+            final sectionSpacing = isLandscape ? 14.0 : 28.0;
+            final itemSpacing = isLandscape ? 10.0 : 18.0;
+            final contentMaxWidth =
+                constraints.maxWidth > 900 ? 760.0 : double.infinity;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                child: Padding(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _Header(title: 'Service List'),
+                      SizedBox(height: sectionSpacing),
+                      _SearchBar(
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      SizedBox(height: sectionSpacing),
+                      const Text(
+                        'Categories',
+                        style: TextStyle(
+                            color: Color(0xFF272A2F),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(height: itemSpacing),
+                      _CategoryTabs(
+                        categories: _categories,
+                        selectedCategory: _selectedCategory,
+                        onCategorySelected: (category) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
                         },
                       ),
+                      SizedBox(height: itemSpacing),
+                      Center(
+                        child: _PageIndicator(
+                          itemCount: _categories.length,
+                          selectedIndex: _categories
+                              .indexOf(_selectedCategory)
+                              .clamp(0, _categories.length - 1),
+                        ),
+                      ),
+                      SizedBox(height: isLandscape ? 12 : 26),
+                      Expanded(
+                        child: _isLoadingServices
+                            ? const Center(child: CircularProgressIndicator())
+                            : _errorMessage != null
+                                ? Center(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(
+                                          color: Color(0xFF6C7078),
+                                          fontSize: 14),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  )
+                                : filteredServices.isEmpty
+                                    ? const Center(
+                                        child: Text(
+                                          'No services found',
+                                          style: TextStyle(
+                                              color: Color(0xFF6C7078),
+                                              fontSize: 14),
+                                        ),
+                                      )
+                                    : ListView.separated(
+                                        padding:
+                                            const EdgeInsets.only(right: 8),
+                                        itemCount: filteredServices.length,
+                                        separatorBuilder: (_, __) =>
+                                            SizedBox(height: itemSpacing),
+                                        itemBuilder: (context, index) {
+                                          final service =
+                                              filteredServices[index];
+                                          return _ServiceCard(
+                                            service: service,
+                                            onTap: () async {
+                                              await context.push(
+                                                  AppRoutes.serviceDetails,
+                                                  extra:
+                                                      service.toDetailsExtra());
+                                              if (mounted) {
+                                                _loadServices();
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -154,7 +186,8 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
       setState(() {
         _services = services.map(_ServiceItem.fromMap).toList();
         if (_services.isNotEmpty &&
-            !_services.any((service) => service.category == _selectedCategory)) {
+            !_services
+                .any((service) => service.category == _selectedCategory)) {
           _selectedCategory = _services.first.category;
         }
         _isLoadingServices = false;
@@ -178,21 +211,31 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Image.asset('assets/images/logo.png', width: 48, height: 48, fit: BoxFit.contain),
-        Text(
-          title,
-          style: const TextStyle(color: Color(0xFF272A2F), fontSize: 24, fontWeight: FontWeight.w800),
+        Image.asset('assets/images/logo.png',
+            width: 48, height: 48, fit: BoxFit.contain),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+                color: Color(0xFF272A2F),
+                fontSize: 24,
+                fontWeight: FontWeight.w800),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         GestureDetector(
           onTap: () => context.pop(),
           child: Container(
             width: 58,
             height: 34,
-            decoration: BoxDecoration(color: const Color(0xFFFEEAB8), borderRadius: BorderRadius.circular(18)),
+            decoration: BoxDecoration(
+                color: const Color(0xFFFEEAB8),
+                borderRadius: BorderRadius.circular(18)),
             alignment: Alignment.center,
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            child: const Icon(Icons.arrow_back_rounded,
+                color: Colors.white, size: 28),
           ),
         ),
       ],
@@ -217,10 +260,13 @@ class _SearchBar extends StatelessWidget {
           child: Container(
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(color: const Color(0xFFF1F2F4), borderRadius: BorderRadius.circular(4)),
+            decoration: BoxDecoration(
+                color: const Color(0xFFF1F2F4),
+                borderRadius: BorderRadius.circular(4)),
             child: Row(
               children: [
-                const Icon(Icons.search_rounded, size: 18, color: Color(0xFF272A2F)),
+                const Icon(Icons.search_rounded,
+                    size: 18, color: Color(0xFF272A2F)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -232,7 +278,8 @@ class _SearchBar extends StatelessWidget {
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
+                    style:
+                        const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
                   ),
                 ),
               ],
@@ -243,8 +290,11 @@ class _SearchBar extends StatelessWidget {
         Container(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(color: const Color(0xFFF1F2F4), borderRadius: BorderRadius.circular(4)),
-          child: const Icon(Icons.filter_list_rounded, color: Color(0xFF6C7078), size: 20),
+          decoration: BoxDecoration(
+              color: const Color(0xFFF1F2F4),
+              borderRadius: BorderRadius.circular(4)),
+          child: const Icon(Icons.filter_list_rounded,
+              color: Color(0xFF6C7078), size: 20),
         ),
       ],
     );
@@ -329,12 +379,15 @@ class _PageIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleCount = itemCount.clamp(0, 12);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (int i = 0; i < itemCount; i++) ...[
-          _IndicatorDot(selected: i == selectedIndex),
-          if (i < itemCount - 1) const SizedBox(width: 8),
+        for (int i = 0; i < visibleCount; i++) ...[
+          _IndicatorDot(
+              selected: i == selectedIndex.clamp(0, visibleCount - 1)),
+          if (i < visibleCount - 1) const SizedBox(width: 8),
         ],
       ],
     );
@@ -391,27 +444,40 @@ class _ServiceCard extends StatelessWidget {
                 children: [
                   Text(
                     service.name,
-                    style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        color: Color(0xFF272A2F),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                   const SizedBox(height: 6),
                   Text(
                     service.code,
-                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 9),
+                    style:
+                        const TextStyle(color: Color(0xFF9CA3AF), fontSize: 9),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   service.price,
-                  style: const TextStyle(color: Color(0xFF272A2F), fontSize: 16, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                      color: Color(0xFF272A2F),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   service.duration,
-                  style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 9, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),

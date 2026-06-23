@@ -38,7 +38,7 @@ class InventoryInputField extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: labelColor ?? const Color(0xFF6C7078),
+            color: labelColor ?? const Color(0xFF272A2F),
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
