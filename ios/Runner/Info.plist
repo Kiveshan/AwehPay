@@ -49,5 +49,7 @@
 	<string>This app uses the camera to scan barcodes and invoices for adding products.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to your photo library to select invoice images for scanning.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Authenticate to access your account securely.</string>
 </dict>
 </plist>

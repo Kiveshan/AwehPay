@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/providers/biometric_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
@@ -96,6 +97,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
       }
 
       if (!mounted) return;
+
+      await _maybePromptBiometricEnrollment(email, password);
+      if (!mounted) return;
+
       if (isAdmin) {
         context.go(AppRoutes.adminHome);
         return;
@@ -131,6 +136,127 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _maybePromptBiometricEnrollment(
+    String email,
+    String password,
+  ) async {
+    final biometric = ref.read(biometricAuthServiceProvider);
+    final storage = ref.read(secureStorageServiceProvider);
+
+    final canCheck = await biometric.canCheckBiometrics;
+    if (!canCheck) return;
+
+    final alreadyEnabled = await storage.getBiometricEnabled();
+    if (alreadyEnabled) return;
+
+    if (!mounted) return;
+
+    final shouldEnable = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEECC1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.fingerprint,
+                    color: Color(0xFF272A2F),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Enable Biometric Sign-In',
+                  style: TextStyle(
+                    color: Color(0xFF272A2F),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Use your fingerprint for faster and more secure access to your account.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF6C7078),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          foregroundColor: const Color(0xFF6C7078),
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text('Not Now'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFEECC1),
+                          foregroundColor: const Color(0xFF272A2F),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text('Enable'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldEnable == true) {
+      await storage.setBiometricEmail(email);
+      await storage.setBiometricPassword(password);
+      await storage.setBiometricEnabled(true);
     }
   }
 

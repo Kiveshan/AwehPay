@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/widgets/biometric_settings_button.dart';
 import '../../../core/widgets/logout_button.dart';
 
 class SystemAdminHomeScreen extends StatefulWidget {
@@ -137,6 +138,8 @@ class _AdminHeader extends StatelessWidget {
           ],
         ),
         const Spacer(),
+        const BiometricSettingsButton(),
+        const SizedBox(width: 4),
         const LogoutButton(),
       ],
     );

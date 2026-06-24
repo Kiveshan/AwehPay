@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/router/app_routes.dart';
+import '../../../core/widgets/biometric_settings_button.dart';
 import '../../../core/widgets/logout_button.dart';
 
 typedef _HomeData = ({
@@ -304,6 +305,8 @@ class _BusinessHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
+        const BiometricSettingsButton(),
+        const SizedBox(width: 4),
         const LogoutButton(),
       ],
     );
