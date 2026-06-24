@@ -7,7 +7,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/logout_button.dart';
 
-typedef _HomeData = ({String businessName, DateTime? insightsUpdatedAt});
+typedef _HomeData = ({
+  String businessName,
+  DateTime? insightsUpdatedAt,
+  String? tierName,
+});
 
 class BusinessHomeScreen extends StatefulWidget {
   const BusinessHomeScreen({super.key});
@@ -22,7 +26,11 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
   Future<_HomeData> _fetchHomeData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null)
-      return (businessName: 'Business', insightsUpdatedAt: null);
+      return (
+        businessName: 'Business',
+        insightsUpdatedAt: null,
+        tierName: null,
+      );
 
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -31,7 +39,11 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
 
     final businessId = userDoc.data()?['businessId'] as String?;
     if (businessId == null || businessId.isEmpty) {
-      return (businessName: 'Business', insightsUpdatedAt: null);
+      return (
+        businessName: 'Business',
+        insightsUpdatedAt: null,
+        tierName: null,
+      );
     }
 
     final results = await Future.wait([
@@ -48,11 +60,14 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
     final businessDoc = results[0] as DocumentSnapshot;
     final summariesSnap = results[1] as QuerySnapshot;
 
-    final name = businessDoc.data() is Map
-        ? (businessDoc.data() as Map<String, dynamic>)['businessName']
-                as String? ??
-            'Business'
-        : 'Business';
+    final businessData = businessDoc.data() is Map
+        ? businessDoc.data() as Map<String, dynamic>
+        : null;
+
+    final name = businessData?['businessName'] as String? ?? 'Business';
+
+    final subscriptionMap = businessData?['subscription'] as Map<String, dynamic>?;
+    final tierName = subscriptionMap?['tierName'] as String?;
 
     DateTime? insightsUpdatedAt;
     if (summariesSnap.docs.isNotEmpty) {
@@ -63,7 +78,23 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
       if (ts is Timestamp) insightsUpdatedAt = ts.toDate();
     }
 
-    return (businessName: name, insightsUpdatedAt: insightsUpdatedAt);
+    return (
+      businessName: name,
+      insightsUpdatedAt: insightsUpdatedAt,
+      tierName: tierName,
+    );
+  }
+
+  bool _isCardLocked({required String cardId, required String? tierName}) {
+    final tier = (tierName ?? 'Basic').trim().toLowerCase();
+    switch (cardId) {
+      case 'sales_tracking':
+        return tier == 'basic';
+      case 'business_insights':
+        return tier == 'basic' || tier == 'plus';
+      default:
+        return false;
+    }
   }
 
   String _formatRelativeTime(DateTime? dt) {
@@ -132,6 +163,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                         builder: (context, snapshot) {
                           final insightsSubtitle = _formatRelativeTime(
                               snapshot.data?.insightsUpdatedAt);
+                          final tierName = snapshot.data?.tierName;
                           return LayoutBuilder(
                             builder: (context, constraints) {
                               const spacing = 16.0;
@@ -184,6 +216,10 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                     subtitle: 'updated',
                                     iconSize: isLandscape ? 38 : 58,
                                     iconContainerSize: isLandscape ? 38 : 58,
+                                    isLocked: _isCardLocked(
+                                      cardId: 'sales_tracking',
+                                      tierName: tierName,
+                                    ),
                                     onTap: () =>
                                         context.go(AppRoutes.salesTracking),
                                   ),
@@ -198,6 +234,10 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                         ? null
                                         : insightsSubtitle,
                                     iconSize: isLandscape ? 42 : 65,
+                                    isLocked: _isCardLocked(
+                                      cardId: 'business_insights',
+                                      tierName: tierName,
+                                    ),
                                     onTap: () => context
                                         .push(AppRoutes.businessInsights),
                                   ),
@@ -281,6 +321,7 @@ class _BusinessTile extends StatelessWidget {
     this.subtitle,
     this.iconSize = 36,
     this.iconContainerSize,
+    this.isLocked = false,
   }) : iconAlignment = Alignment.topRight;
 
   final double width;
@@ -293,12 +334,15 @@ class _BusinessTile extends StatelessWidget {
   final double iconSize;
   final double? iconContainerSize;
   final Alignment iconAlignment;
+  final bool isLocked;
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = isLocked ? Colors.white70 : Colors.white;
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
+      onTap: isLocked ? null : onTap,
       child: Container(
         width: width,
         height: height,
@@ -307,36 +351,49 @@ class _BusinessTile extends StatelessWidget {
           color: color,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.end,
+        child: Stack(
           children: [
-            Align(
-              alignment: iconAlignment,
-              child: SizedBox(
-                width: iconContainerSize ?? iconSize,
-                height: iconContainerSize ?? iconSize,
-                child: iconWidget,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Align(
+                  alignment: iconAlignment,
+                  child: SizedBox(
+                    width: iconContainerSize ?? iconSize,
+                    height: iconContainerSize ?? iconSize,
+                    child: isLocked
+                        ? Icon(
+                            Icons.lock_outline,
+                            color: iconColor,
+                            size: iconContainerSize ?? iconSize,
+                          )
+                        : iconWidget,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isLocked ? Colors.white54 : Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isLocked ? Colors.white38 : Colors.white,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
             ),
-            const Spacer(),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (subtitle != null)
-              Text(
-                subtitle!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 10),
-              ),
           ],
         ),
       ),

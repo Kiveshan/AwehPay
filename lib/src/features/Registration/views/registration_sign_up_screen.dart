@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import 'package:awe_pay/src/features/Registration/models/registration_draft.dart';
+import 'package:awe_pay/src/features/Registration/utils/registration_validator.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_scaffold.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
@@ -22,6 +23,11 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
+  String? _fullNameError;
+  String? _phoneNumberError;
+  String? _emailError;
+  String? _passwordError;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -38,20 +44,18 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (fullName.isEmpty ||
-        phoneNumber.isEmpty ||
-        email.isEmpty ||
-        password.isEmpty) {
-      setState(() {
-        _errorMessage = 'Complete all personal details';
-      });
-      return;
-    }
+    setState(() {
+      _fullNameError = RegistrationValidator.fullName(fullName);
+      _phoneNumberError = RegistrationValidator.phoneNumber(phoneNumber);
+      _emailError = RegistrationValidator.email(email);
+      _passwordError = RegistrationValidator.password(password);
+      _errorMessage = null;
+    });
 
-    if (password.length < 6) {
-      setState(() {
-        _errorMessage = 'Password must be at least 6 characters';
-      });
+    if (_fullNameError != null ||
+        _phoneNumberError != null ||
+        _emailError != null ||
+        _passwordError != null) {
       return;
     }
 
@@ -79,6 +83,7 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                 hintText: 'Enter your full name',
                 controller: _fullNameController,
                 suffixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                errorText: _fullNameError,
               ),
               const SizedBox(height: 18),
               AdminTextField(
@@ -87,6 +92,7 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                 controller: _contactNumberController,
                 keyboardType: TextInputType.phone,
                 suffixIcon: const Icon(Icons.phone_outlined, size: 18),
+                errorText: _phoneNumberError,
               ),
               const SizedBox(height: 18),
               AdminTextField(
@@ -95,14 +101,28 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 suffixIcon: const Icon(Icons.mail_outline_rounded, size: 18),
+                errorText: _emailError,
               ),
               const SizedBox(height: 18),
               AdminTextField(
                 label: 'Password',
                 hintText: 'Create a password',
                 controller: _passwordController,
-                obscureText: true,
-                suffixIcon: const Icon(Icons.visibility_off_outlined, size: 18),
+                obscureText: _obscurePassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+                errorText: _passwordError,
               ),
               const SizedBox(height: 28),
               if (_errorMessage != null)
