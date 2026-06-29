@@ -12,6 +12,7 @@ class AdminTextField extends StatelessWidget {
     this.keyboardType,
     this.readOnly = false,
     this.alignLabelAbove = false,
+    this.errorText,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class AdminTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool readOnly;
   final bool alignLabelAbove;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +41,7 @@ class AdminTextField extends StatelessWidget {
         labelText: alignLabelAbove ? null : label,
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.grey.shade400),
+        errorText: errorText,
         suffixIcon: suffixIcon != null
             ? IconTheme(
                 data: IconThemeData(color: Colors.grey.shade400),
