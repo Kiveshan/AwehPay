@@ -172,7 +172,7 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5C9B7),
+                            color: const Color(0xFFDFA890),
                             borderRadius: BorderRadius.circular(18),
                           ),
                           alignment: Alignment.center,
@@ -248,7 +248,7 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
                   Expanded(
                     child: _ActionButton(
                       label: _isSaving ? 'Saving...' : 'Save Products',
-                      color: const Color(0xFFF5C9B7),
+                      color: const Color(0xFFDFA890),
                       onTap: _isSaving ? null : _saveProducts,
                     ),
                   ),

@@ -6,6 +6,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   bool _isProductAdded = false;
   bool _isSavingProduct = false;
   bool _isProcessingInvoice = false;
+  Timer? _successTimer;
   final _apiService = ApiService();
   final _invoiceScanService = InvoiceScanService();
   late final TextEditingController _productNameController;
@@ -110,6 +111,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           sellingPrice: sellingPrice,
           stockQuantity: effectiveStockQuantity,
           lowStockThreshold: lowStockThreshold,
+          category: category,
         );
       } else {
         await _apiService.addProduct(
@@ -131,6 +133,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         setState(() {
           _isProductAdded = true;
         });
+        _scheduleSuccessReset();
       }
     } catch (error) {
       if (mounted) {
@@ -195,5 +198,28 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  /// After a successful add, the success screen is shown for 5 seconds and then
+  /// the screen returns to a fresh Add Product form ready for the next product.
+  void _scheduleSuccessReset() {
+    _successTimer?.cancel();
+    _successTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      setState(() {
+        _isProductAdded = false;
+        _selectedProductId = null;
+        _productNameLockedBySelection = false;
+        _hasScannedBarcode = false;
+        _selectedCategory = null;
+        _productNameController.clear();
+        _categoryController.clear();
+        _barcodeController.clear();
+        _costPriceController.clear();
+        _sellingPriceController.clear();
+        _quantityController.clear();
+        _alertQuantityController.clear();
+      });
+    });
   }
 }

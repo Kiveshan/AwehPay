@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:awe_pay/src/core/services/api_service.dart';
 import 'package:awe_pay/src/core/router/app_routes.dart';
 import 'package:awe_pay/src/features/Business/Inventory/models/scanned_product.dart';
@@ -125,6 +127,7 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   @override
   void dispose() {
+    _successTimer?.cancel();
     _productNameController.dispose();
     _categoryController.dispose();
     _barcodeController.dispose();

@@ -185,7 +185,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                   _BusinessTile(
                                     width: cardWidth,
                                     height: cardHeight,
-                                    color: const Color(0xFFF4C4B7),
+                                    color: const Color(0xFFDFA890),
                                     iconWidget: SvgPicture.asset(
                                         'assets/images/StockCartIcon.svg'),
                                     title: 'Inventory Management',

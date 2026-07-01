@@ -5,9 +5,10 @@
   "scripts": {
     "backend": "npm --prefix backend start",
     "flutter": "flutter run",
-    "flutter:emulator": "flutter run --dart-define=AWEHPAY_API_BASE_URL=http://10.0.2.2:5000",
-    "flutter:phone": "flutter run --dart-define=AWEHPAY_API_BASE_URL=http://10.210.197.47:5000",
-    "flutter:staging": "flutter run --dart-define=AWEHPAY_API_BASE_URL=https://api.awehpay.co.za",
+  "flutter:emulator": "flutter run --dart-define=AWEHPAY_API_BASE_URL=http://10.0.2.2:5000",
+"flutter:phone": "flutter run --dart-define=AWEHPAY_API_BASE_URL=http://10.210.197.47:5000",
+
+"flutter:staging": "flutter run --dart-define=AWEHPAY_API_BASE_URL=https://api.awehpay.co.za",
     "dev": "concurrently -n backend,flutter -c cyan,green \"npm run backend\" \"npm run flutter:emulator\""
   },
   "devDependencies": {

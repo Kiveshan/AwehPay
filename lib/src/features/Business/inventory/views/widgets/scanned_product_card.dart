@@ -17,7 +17,7 @@ class ScannedProductCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFF5C9B7)),
+        border: Border.all(color: const Color(0xFFDFA890)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(

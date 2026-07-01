@@ -46,6 +46,7 @@ router.post('/update-product', async (req, res) => {
       sellingPrice,
       stockQuantity,
       lowStockThreshold,
+      category,
     } = req.body;
 
     if (!idToken) {
@@ -91,6 +92,10 @@ router.post('/update-product', async (req, res) => {
 
     if (typeof barcode === 'string') {
       updateData.barcode = barcode.trim();
+    }
+
+    if (typeof category === 'string' && category.trim()) {
+      updateData.category = category.trim();
     }
 
     await productRef.update(updateData);

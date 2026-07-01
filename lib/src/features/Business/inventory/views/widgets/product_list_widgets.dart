@@ -168,7 +168,7 @@ class _CategoryTab extends StatelessWidget {
         height: 24,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFF5C9B7) : Colors.transparent,
+          color: selected ? const Color(0xFFDFA890) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -220,7 +220,7 @@ class _IndicatorDot extends StatelessWidget {
       width: selected ? 18 : 14,
       height: 4,
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFF5C9B7) : const Color(0xFFD8DCE2),
+        color: selected ? const Color(0xFFDFA890) : const Color(0xFFD8DCE2),
         borderRadius: BorderRadius.circular(4),
       ),
     );
