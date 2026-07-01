@@ -19,7 +19,6 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
   String _selectedType = 'Product';
   final _apiService = ApiService();
   int? _lowStockCount;
-  DateTime? _lastFetchedAt;
   Timer? _tickTimer;
 
   @override
@@ -39,8 +38,10 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
   }
 
   String _formatAge() {
-    final ts = InventoryTimestamp.lastChangedAt ?? _lastFetchedAt;
-    if (ts == null) return 'updating…';
+    // Only reflect real inventory changes (a product added or removed), never
+    // a plain page load / refresh.
+    final ts = InventoryTimestamp.lastChangedAt;
+    if (ts == null) return '';
     final diff = DateTime.now().difference(ts);
     if (diff.inSeconds < 60) return 'updated just now';
     if (diff.inMinutes < 60) {
@@ -63,7 +64,6 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
         }).length;
         if (mounted) setState(() {
           _lowStockCount = count;
-          _lastFetchedAt = DateTime.now();
         });
       }
     } catch (_) {
@@ -130,7 +130,8 @@ class _InventoryMenuScreenState extends State<InventoryMenuScreen> {
                       ),
                       SizedBox(height: actionSpacing),
                       if (_selectedType == 'Product' &&
-                          (_lowStockCount == null || _lowStockCount! > 0))
+                          _lowStockCount != null &&
+                          _lowStockCount! > 0)
                         LowStockWarningBar(
                           count: _lowStockCount,
                           onTap: () async {

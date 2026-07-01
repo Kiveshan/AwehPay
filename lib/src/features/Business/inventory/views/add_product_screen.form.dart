@@ -91,6 +91,12 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       return;
     }
 
+    // In replenish mode, the entered quantity is ADDED to the existing stock
+    // already stored for this product rather than replacing it.
+    final effectiveStockQuantity = widget.isReplenishStock
+        ? (widget.prefillStockQuantity ?? 0) + stockQuantity
+        : stockQuantity;
+
     setState(() {
       _isSavingProduct = true;
     });
@@ -102,7 +108,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
-          stockQuantity: stockQuantity,
+          stockQuantity: effectiveStockQuantity,
           lowStockThreshold: lowStockThreshold,
         );
       } else {
@@ -111,7 +117,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
-          stockQuantity: stockQuantity,
+          stockQuantity: effectiveStockQuantity,
           category: category,
           lowStockThreshold: lowStockThreshold,
         );

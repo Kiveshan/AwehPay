@@ -75,7 +75,9 @@ class _AddProductScreenState extends State<AddProductScreen>
           : '',
     );
     _quantityController = TextEditingController(
-      text: widget.prefillStockQuantity != null
+      // In replenish mode the field represents the quantity being ADDED, so it
+      // starts empty; the existing stock is added to it on save.
+      text: (!widget.isReplenishStock && widget.prefillStockQuantity != null)
           ? '${widget.prefillStockQuantity}'
           : '',
     );

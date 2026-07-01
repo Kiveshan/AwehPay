@@ -3,22 +3,24 @@ part of 'add_product_screen.dart';
 /// Barcode and invoice scanning flows for [AddProductScreen].
 mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
   Future<void> _showScanOptions() async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
       builder: (context) {
-        return ScanTypeBottomSheet(
-          onScanBarcode: () {
-            Navigator.of(context).pop();
-            _handleBarcodeScan();
-          },
-          onScanInvoice: () {
-            Navigator.of(context).pop();
-            _handleInvoiceScan();
-          },
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(18)),
+          ),
+          child: ScanTypeBottomSheet(
+            onScanBarcode: () {
+              Navigator.of(context).pop();
+              _handleBarcodeScan();
+            },
+            onScanInvoice: () {
+              Navigator.of(context).pop();
+              _handleInvoiceScan();
+            },
+          ),
         );
       },
     );
@@ -82,20 +84,22 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
 
   Future<void> _handleInvoiceScan() async {
     InvoiceImageSource? source;
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
       builder: (context) {
-        return InvoiceSourceBottomSheet(
-          onSelect: (choice) {
-            source = choice == InvoiceSourceChoice.camera
-                ? InvoiceImageSource.camera
-                : InvoiceImageSource.file;
-            Navigator.of(context).pop();
-          },
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(18)),
+          ),
+          child: InvoiceSourceBottomSheet(
+            onSelect: (choice) {
+              source = choice == InvoiceSourceChoice.camera
+                  ? InvoiceImageSource.camera
+                  : InvoiceImageSource.file;
+              Navigator.of(context).pop();
+            },
+          ),
         );
       },
     );
