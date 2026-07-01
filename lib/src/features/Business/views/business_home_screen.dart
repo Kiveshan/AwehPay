@@ -222,7 +222,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                       tierName: tierName,
                                     ),
                                     onTap: () =>
-                                        context.go(AppRoutes.salesTracking),
+                                        context.push(AppRoutes.salesTracking),
                                   ),
                                   _BusinessTile(
                                     width: cardWidth,
