@@ -136,7 +136,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     return AdminScaffold(
-      title: 'Purchases',
+      title: 'Point of Sale',
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Column(
