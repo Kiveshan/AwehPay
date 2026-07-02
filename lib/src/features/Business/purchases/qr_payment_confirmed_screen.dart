@@ -22,7 +22,7 @@ class QRPaymentConfirmedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AdminScaffold(
-      title: 'Purchases',
+      title: 'Point of Sale',
       child: Column(
         children: [
           Expanded(

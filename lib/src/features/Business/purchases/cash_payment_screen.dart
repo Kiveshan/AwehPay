@@ -132,7 +132,7 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return AdminScaffold(
-      title: 'Purchases',
+      title: 'Point of Sale',
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Column(
