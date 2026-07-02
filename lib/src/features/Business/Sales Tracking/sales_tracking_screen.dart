@@ -121,9 +121,10 @@ class _SalesTrackingScreenState extends State<SalesTrackingScreen> {
         ? "Today's Sales"
         : '$formatted Sales';
     final totalCount = (_summary['totalTransactions'] as num?)?.toInt() ?? 0;
+    final _saleTodayWord = totalCount == 1 ? 'sale' : 'sales';
     final breakdownSubtitle = _isToday(_selectedDate)
-        ? '$totalCount sales today'
-        : '$totalCount sales on $formatted';
+        ? '$totalCount $_saleTodayWord today'
+        : '$totalCount $_saleTodayWord on $formatted';
 
     return Scaffold(
       backgroundColor: SalesTrackingScreen._backgroundColor,

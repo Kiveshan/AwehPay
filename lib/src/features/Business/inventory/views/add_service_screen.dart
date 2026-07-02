@@ -58,7 +58,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                         width: double.infinity,
                         padding: EdgeInsets.all(isCompact ? 12 : 14),
                         decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFF5C9B7))),
+                            border: Border.all(color: const Color(0xFFDFA890))),
                         child: Column(
                           children: [
                             if (_isServiceAdded) ...[
@@ -360,7 +360,7 @@ class _ServicePricingFields extends StatelessWidget {
       label: 'Duration (min)',
       controller: durationController,
       keyboardType: TextInputType.number,
-      spinnerColor: const Color(0xFFF5C9B7),
+      spinnerColor: const Color(0xFFDFA890),
       onIncrement: onIncrement,
       onDecrement: onDecrement,
     );
@@ -468,7 +468,7 @@ class _PrimaryButton extends StatelessWidget {
         width: double.infinity,
         height: 38,
         decoration: BoxDecoration(
-            color: const Color(0xFFF5C9B7),
+            color: const Color(0xFFDFA890),
             borderRadius: BorderRadius.circular(4)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -57,7 +57,7 @@ class _TodaySalesCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '$totalCount sales',
+            '$totalCount ${totalCount == 1 ? 'sale' : 'sales'}',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 15,

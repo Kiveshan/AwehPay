@@ -125,14 +125,13 @@ class _MetricTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          if (detail.isNotEmpty)
-            Text(
-              detail,
-              style: const TextStyle(
-                fontSize: 12,
-                color: SalesTrackingScreen._textSecondary,
-              ),
+          Text(
+            detail,
+            style: const TextStyle(
+              fontSize: 12,
+              color: SalesTrackingScreen._textSecondary,
             ),
+          ),
         ],
       ),
     );

@@ -30,7 +30,7 @@ class ScanOptionTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5C9B7),
+                color: const Color(0xFFDFA890),
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,

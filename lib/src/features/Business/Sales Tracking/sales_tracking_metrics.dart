@@ -41,14 +41,14 @@ class _SalesMetricsGrid extends StatelessWidget {
               iconColor: const Color(0xFFF6B332),
               label: 'Best Seller',
               value: bestSeller,
-              detail: bestSellerQty > 0 ? '$bestSellerQty units sold today' : '',
+              detail: bestSellerQty > 0 ? '$bestSellerQty ${bestSellerQty == 1 ? 'unit' : 'units'} sold today' : '',
             ),
             _MetricTile(
               icon: Icons.sentiment_neutral,
               iconColor: const Color(0xFFF6B332),
               label: 'Slowest Seller',
               value: slowestSeller,
-              detail: slowestStock > 0 ? '$slowestStock units still in stock' : '',
+              detail: slowestStock > 0 ? '$slowestStock ${slowestStock == 1 ? 'unit' : 'units'} still in stock' : '',
             ),
           ].map((tile) {
             return SizedBox(
