@@ -185,7 +185,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                   _BusinessTile(
                                     width: cardWidth,
                                     height: cardHeight,
-                                    color: const Color(0xFFF4C4B7),
+                                    color: const Color(0xFFDFA890),
                                     iconWidget: SvgPicture.asset(
                                         'assets/images/StockCartIcon.svg'),
                                     title: 'Inventory Management',
@@ -199,7 +199,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                     color: const Color(0xFFA9A5F4),
                                     iconWidget: SvgPicture.asset(
                                         'assets/images/MoneyIcon.svg'),
-                                    title: 'Purchases',
+                                    title: 'Point of Sale',
                                     iconSize: isLandscape ? 42 : 65,
                                     onTap: () =>
                                         context.push(AppRoutes.purchases),

@@ -13,7 +13,7 @@ class ScanBarcodeButton extends StatelessWidget {
         width: 210,
         height: 42,
         decoration: BoxDecoration(
-          color: const Color(0xFFF5C9B7),
+          color: const Color(0xFFDFA890),
           borderRadius: BorderRadius.circular(4),
         ),
         child: const Row(

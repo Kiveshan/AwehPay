@@ -29,7 +29,7 @@ class ProductDetailsScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFF5C9B7)),
+                  border: Border.all(color: const Color(0xFFDFA890)),
                 ),
                 child: Column(
                   children: [
@@ -84,7 +84,7 @@ class ProductDetailsScreen extends StatelessWidget {
                           width: double.infinity,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5C9B7),
+                            color: const Color(0xFFDFA890),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Row(

@@ -125,7 +125,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                 width: 260,
                 height: 160,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFF5C9B7), width: 3),
+                  border: Border.all(color: const Color(0xFFDFA890), width: 3),
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -157,7 +157,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                     child: Container(
                       height: 46,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5C9B7),
+                        color: const Color(0xFFDFA890),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       alignment: Alignment.center,

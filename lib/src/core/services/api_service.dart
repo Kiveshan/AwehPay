@@ -303,6 +303,7 @@ class ApiService {
     required double sellingPrice,
     required int stockQuantity,
     required int lowStockThreshold,
+    required String category,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -322,6 +323,7 @@ class ApiService {
         'sellingPrice': sellingPrice,
         'stockQuantity': stockQuantity,
         'lowStockThreshold': lowStockThreshold,
+        'category': category,
       }),
     );
 
