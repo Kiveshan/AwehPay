@@ -20,7 +20,7 @@ class SaveButton extends StatelessWidget {
         width: double.infinity,
         height: 38,
         decoration: BoxDecoration(
-          color: const Color(0xFFF5C9B7),
+          color: const Color(0xFFDFA890),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(

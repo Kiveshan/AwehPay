@@ -79,7 +79,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                         width: double.infinity,
                         padding: EdgeInsets.all(isCompact ? 12 : 14),
                         decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFF5C9B7))),
+                            border: Border.all(color: const Color(0xFFDFA890))),
                         child: Column(
                           children: [
                             _InputField(
@@ -389,7 +389,7 @@ class _ServiceActionButtons extends StatelessWidget {
     final updateButton = _ActionButton(
       label: 'Update Service',
       icon: Icons.sync_rounded,
-      color: const Color(0xFFF5C9B7),
+      color: const Color(0xFFDFA890),
       onTap: isSavingService ? null : onUpdateService,
     );
     final deleteButton = _ActionButton(

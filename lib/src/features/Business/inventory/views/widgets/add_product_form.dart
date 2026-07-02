@@ -64,7 +64,7 @@ class AddProductForm extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         border: Border.all(
-          color: const Color(0xFFF5C9B7),
+          color: const Color(0xFFDFA890),
         ),
       ),
       child: Column(
@@ -125,7 +125,7 @@ class AddProductForm extends StatelessWidget {
                   textColor: null,
                   controller: quantityController,
                   keyboardType: TextInputType.number,
-                  spinnerColor: const Color(0xFFF5C9B7),
+                  spinnerColor: const Color(0xFFDFA890),
                   readOnly: isProductAdded,
                   onIncrement: isProductAdded ? null : onIncrementQuantity,
                   onDecrement: isProductAdded ? null : onDecrementQuantity,
@@ -156,7 +156,7 @@ class AddProductForm extends StatelessWidget {
             controller: alertQuantityController,
             keyboardType: TextInputType.number,
             trailingText: 'Units',
-            spinnerColor: const Color(0xFFF5C9B7),
+            spinnerColor: const Color(0xFFDFA890),
             readOnly: isProductAdded,
             onIncrement: isProductAdded ? null : onIncrementAlertQuantity,
             onDecrement: isProductAdded ? null : onDecrementAlertQuantity,
