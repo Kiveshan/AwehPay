@@ -75,7 +75,7 @@ class _SalesBreakdownScreenState extends State<SalesBreakdownScreen> {
 
         return _Transaction(
           time: TimeOfDay(
-            hour: (timeMap['hour'] as num?)?.toInt() ?? 0,
+            hour: (((timeMap['hour'] as num?)?.toInt() ?? 0) + 2) % 24,
             minute: (timeMap['minute'] as num?)?.toInt() ?? 0,
           ),
           summary: raw['summary'] as String? ?? '',

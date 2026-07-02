@@ -8,7 +8,7 @@ class _SalesMetricsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topSale = (metrics['topSale'] as num?)?.toDouble() ?? 0.0;
-    final busiestHour = (metrics['busiestHour'] as String?) ?? '--:00 - --:00';
+    final busiestHour = _shiftHourRange((metrics['busiestHour'] as String?) ?? '--:00 - --:00', 2);
     final bestSeller = (metrics['bestSeller'] as String?) ?? 'N/A';
     final bestSellerQty = (metrics['bestSellerUnits'] as num?)?.toInt() ?? 0;
     final slowestSeller = (metrics['slowestSeller'] as String?) ?? 'N/A';
@@ -97,6 +97,18 @@ class _SalesMetricsGrid extends StatelessWidget {
   }
 }
 
+
+// Shifts a "HH:00 - HH:00" string by [hours] hours
+String _shiftHourRange(String value, int hours) {
+  final parts = value.split(' - ');
+  if (parts.length != 2) return value;
+  final startHour = int.tryParse(parts[0].split(':')[0]);
+  final endHour = int.tryParse(parts[1].split(':')[0]);
+  if (startHour == null || endHour == null) return value;
+  final s = ((startHour + hours) % 24).toString().padLeft(2, '0');
+  final e = ((endHour + hours) % 24).toString().padLeft(2, '0');
+  return '$s:00 - $e:00';
+}
 
 class _SalesBreakdownCard extends StatelessWidget {
   const _SalesBreakdownCard({
