@@ -67,7 +67,8 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
 
     final name = businessData?['businessName'] as String? ?? 'Business';
 
-    final subscriptionMap = businessData?['subscription'] as Map<String, dynamic>?;
+    final subscriptionMap =
+        businessData?['subscription'] as Map<String, dynamic>?;
     final tierName = subscriptionMap?['tierName'] as String?;
 
     DateTime? insightsUpdatedAt;

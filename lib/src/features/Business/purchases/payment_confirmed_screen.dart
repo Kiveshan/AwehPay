@@ -22,7 +22,6 @@ class PaymentConfirmedScreen extends StatelessWidget {
 
   double get _changeDue => collectedAmount - totalAmount;
   double get _tax => totalAmount * 0.15;
-  double get _total => totalAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +89,6 @@ class PaymentConfirmedScreen extends StatelessWidget {
                     changeDue: _changeDue,
                     subtotal: totalAmount,
                     tax: _tax,
-                    total: _total,
                   ),
                 ],
               ),

@@ -26,11 +26,12 @@ class CashPaymentScreen extends StatefulWidget {
 class _CashPaymentScreenState extends State<CashPaymentScreen> {
   double _collectedAmount = 0;
   bool _isSubmitting = false;
-  final TextEditingController _cellController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final ApiService _apiService = ApiService();
 
-  double get _changeDue => (_collectedAmount - widget.totalAmount).clamp(0, double.infinity);
+  double get _changeDue =>
+      (_collectedAmount - widget.totalAmount).clamp(0, double.infinity);
   bool get _isExactOrOver => _collectedAmount >= widget.totalAmount;
 
   List<double> get _quickAmounts {
@@ -58,7 +59,7 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
   @override
   void dispose() {
     _amountController.removeListener(_onAmountChanged);
-    _cellController.dispose();
+    _emailController.dispose();
     _amountController.dispose();
     super.dispose();
   }
@@ -72,7 +73,7 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
   void _selectQuickAmount(double amount) {
     _amountController.removeListener(_onAmountChanged);
     setState(() {
-      _collectedAmount += amount;
+      _collectedAmount = amount;
       _amountController.text = '${_collectedAmount.toInt()}';
     });
     _amountController.addListener(_onAmountChanged);
@@ -101,9 +102,9 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
         amountSubtotal: widget.totalAmount,
         amountTotal: widget.totalAmount,
         amountCollected: _collectedAmount,
-        customerPhone: _cellController.text.trim().isEmpty
+        customerEmail: _emailController.text.trim().isEmpty
             ? null
-            : _cellController.text.trim(),
+            : _emailController.text.trim(),
       );
 
       if (!mounted) return;
@@ -148,8 +149,9 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
             ),
             const SizedBox(height: 16),
             ...widget.items.map((item) {
-              final unitPrice =
-                  double.tryParse(item.price.replaceAll('R', '').replaceAll(',', '')) ?? 0.0;
+              final unitPrice = double.tryParse(
+                      item.price.replaceAll('R', '').replaceAll(',', '')) ??
+                  0.0;
               final lineTotal = unitPrice * item.quantity;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -244,7 +246,8 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
                 ),
                 decoration: InputDecoration(
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   prefixText: 'R ',
                   prefixStyle: const TextStyle(
                     color: Color(0xFF272A2F),
@@ -254,8 +257,10 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
                   suffixIcon: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.keyboard_arrow_up, size: 18, color: Colors.grey.shade500),
-                      Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade500),
+                      Icon(Icons.keyboard_arrow_up,
+                          size: 18, color: Colors.grey.shade500),
+                      Icon(Icons.keyboard_arrow_down,
+                          size: 18, color: Colors.grey.shade500),
                     ],
                   ),
                 ),
@@ -289,7 +294,9 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               decoration: BoxDecoration(
-                color: _isExactOrOver ? const Color(0xFFE6F9F5) : const Color(0xFFFFECEC),
+                color: _isExactOrOver
+                    ? const Color(0xFFE6F9F5)
+                    : const Color(0xFFFFECEC),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -298,7 +305,9 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
                   Text(
                     'R${_changeDue.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: _isExactOrOver ? const Color(0xFF00B09B) : const Color(0xFFE55353),
+                      color: _isExactOrOver
+                          ? const Color(0xFF00B09B)
+                          : const Color(0xFFE55353),
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -306,17 +315,18 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
                   if (!_isExactOrOver)
                     Text(
                       'Short by R${(widget.totalAmount - _collectedAmount).toStringAsFixed(2)}',
-                      style: const TextStyle(color: Color(0xFFE55353), fontSize: 12),
+                      style: const TextStyle(
+                          color: Color(0xFFE55353), fontSize: 12),
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
             AdminTextField(
-              label: 'Customer Cell Number (for receipt)',
-              hintText: '0734059910',
-              controller: _cellController,
-              keyboardType: TextInputType.phone,
+              label: 'Customer Email Address (for receipt)',
+              hintText: 'customer@email.com',
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 28),
             PurpleButton(
