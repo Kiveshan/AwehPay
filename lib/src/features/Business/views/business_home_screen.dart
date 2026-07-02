@@ -67,7 +67,8 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
 
     final name = businessData?['businessName'] as String? ?? 'Business';
 
-    final subscriptionMap = businessData?['subscription'] as Map<String, dynamic>?;
+    final subscriptionMap =
+        businessData?['subscription'] as Map<String, dynamic>?;
     final tierName = subscriptionMap?['tierName'] as String?;
 
     DateTime? insightsUpdatedAt;
@@ -199,7 +200,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                     color: const Color(0xFFA9A5F4),
                                     iconWidget: SvgPicture.asset(
                                         'assets/images/MoneyIcon.svg'),
-                                    title: 'Purchases',
+                                    title: 'Point of Sale',
                                     iconSize: isLandscape ? 42 : 65,
                                     onTap: () =>
                                         context.push(AppRoutes.purchases),

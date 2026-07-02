@@ -152,7 +152,7 @@ class ApiService {
     required double amountSubtotal,
     required double amountTotal,
     required double amountCollected,
-    String? customerPhone,
+    String? customerEmail,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -172,7 +172,7 @@ class ApiService {
         'amountSubtotal': amountSubtotal,
         'amountTotal': amountTotal,
         'amountCollected': amountCollected,
-        'customerPhone': customerPhone ?? '',
+        'customerEmail': customerEmail ?? '',
       }),
     );
 

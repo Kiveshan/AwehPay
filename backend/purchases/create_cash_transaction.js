@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { sendReceiptEmail } = require('../email/send_receipt');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -14,7 +15,7 @@ router.post('/cash-transaction', async (req, res) => {
       return res.status(401).json({ error: 'Authorization token is required' });
     }
 
-    const { items, amountSubtotal, amountTotal, amountCollected, customerPhone } = req.body;
+    const { items, amountSubtotal, amountTotal, amountCollected, customerEmail } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'At least one item is required' });
@@ -80,7 +81,7 @@ router.post('/cash-transaction', async (req, res) => {
         amountTotal,
         amountCollected,
         amountChange,
-        customerPhone: customerPhone ?? '',
+        customerEmail: customerEmail ?? '',
         items: items.map((item) => ({
           itemId: item.itemId ?? '',
           itemType: item.type ?? 'product',
@@ -103,6 +104,29 @@ router.post('/cash-transaction', async (req, res) => {
         });
       }
     });
+
+    // Best-effort receipt email — never blocks or fails the payment response.
+    if (customerEmail && customerEmail.includes('@')) {
+      const businessDoc = await businessRef.get();
+      const businessName = businessDoc.data()?.businessName || 'AwehPay';
+      sendReceiptEmail({
+        toEmail: customerEmail,
+        businessName,
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: parseFloat((item.unitPrice * item.quantity).toFixed(2)),
+        })),
+        amountSubtotal,
+        amountTax,
+        amountTotal,
+        amountCollected,
+        amountChange,
+        paymentMethod: 'cash',
+        transactionId: transactionRef.id,
+      }).catch((e) => console.error('receipt email dispatch failed:', e.message));
+    }
 
     res.status(201).json({
       success: true,

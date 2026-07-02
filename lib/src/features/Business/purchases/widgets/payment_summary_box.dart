@@ -7,14 +7,12 @@ class PaymentSummaryBox extends StatelessWidget {
     required this.changeDue,
     required this.subtotal,
     required this.tax,
-    required this.total,
     super.key,
   });
 
   final double changeDue;
   final double subtotal;
   final double tax;
-  final double total;
 
   @override
   Widget build(BuildContext context) {
@@ -41,40 +39,6 @@ class PaymentSummaryBox extends StatelessWidget {
             label: 'Tax (15%)',
             value: 'R${tax.toStringAsFixed(2)}',
             bold: true,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total',
-                style: TextStyle(
-                  color: Color(0xFF272A2F),
-                  fontSize: 14,
-                ),
-              ),
-              Row(
-                children: [
-                  const Text(
-                    'Success',
-                    style: TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'R${total.toInt()}',
-                    style: const TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ],
       ),
