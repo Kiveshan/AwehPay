@@ -147,6 +147,8 @@ final appRouter = GoRouter(
           prefillBarcode: extra['barcode'] as String?,
           prefillCostPrice: (extra['costPrice'] as num?)?.toDouble(),
           prefillSellingPrice: (extra['sellingPrice'] as num?)?.toDouble(),
+          prefillTotalCost: (extra['totalCost'] as num?)?.toDouble(),
+          prefillVat: extra['vat'] as bool?,
           prefillStockQuantity: (extra['stockQuantity'] as num?)?.toInt(),
           prefillLowStockThreshold:
               (extra['lowStockThreshold'] as num?)?.toInt(),

@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
 
+part 'product_details_screen.widgets.dart';
+
 class ProductDetailsScreen extends StatelessWidget {
   const ProductDetailsScreen({
     super.key,
@@ -41,7 +43,7 @@ class ProductDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                     ],
                     _DetailField(label: 'Product Name', value: details.name),
-                    if (details.barcode.isNotEmpty) ...[  
+                    if (details.barcode.isNotEmpty) ...[
                       const SizedBox(height: 18),
                       _DetailField(label: 'Product Barcode', value: details.barcode),
                     ],
@@ -51,6 +53,16 @@ class ProductDetailsScreen extends StatelessWidget {
                         Expanded(child: _DetailField(label: 'Cost Price', value: details.costPrice)),
                         const SizedBox(width: 28),
                         Expanded(child: _DetailField(label: 'Selling Price', value: details.sellingPrice)),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(child: _DetailField(label: 'Total Cost', value: details.totalCost)),
+                        const SizedBox(width: 28),
+                        Expanded(
+                          child: _VatField(vatEnabled: details.vat),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -74,6 +86,8 @@ class ProductDetailsScreen extends StatelessWidget {
                               'barcode': details.barcode,
                               'costPrice': details.rawCostPrice,
                               'sellingPrice': details.rawSellingPrice,
+                              'totalCost': details.rawTotalCost,
+                              'vat': details.vat,
                               'stockQuantity': details.rawStockQuantity,
                               'lowStockThreshold': details.rawLowStockThreshold,
                             },
@@ -120,11 +134,14 @@ class _ProductDetailsData {
     required this.barcode,
     required this.costPrice,
     required this.sellingPrice,
+    required this.totalCost,
+    required this.vat,
     required this.quantity,
     required this.category,
     required this.isLowStock,
     this.rawCostPrice,
     this.rawSellingPrice,
+    this.rawTotalCost,
     this.rawStockQuantity,
     this.rawLowStockThreshold,
   });
@@ -134,11 +151,14 @@ class _ProductDetailsData {
   final String barcode;
   final String costPrice;
   final String sellingPrice;
+  final String totalCost;
+  final bool vat;
   final String quantity;
   final String category;
   final bool isLowStock;
   final double? rawCostPrice;
   final double? rawSellingPrice;
+  final double? rawTotalCost;
   final int? rawStockQuantity;
   final int? rawLowStockThreshold;
 
@@ -149,11 +169,14 @@ class _ProductDetailsData {
       barcode: product?['barcode'] as String? ?? '',
       costPrice: product?['costPrice'] as String? ?? 'R 20.00',
       sellingPrice: product?['sellingPrice'] as String? ?? 'R 35.00',
+      totalCost: product?['totalCost'] as String? ?? 'R 0.00',
+      vat: product?['vat'] as bool? ?? false,
       quantity: product?['quantity'] as String? ?? '5',
       category: product?['category'] as String? ?? 'Household',
       isLowStock: product?['isLowStock'] as bool? ?? true,
       rawCostPrice: (product?['rawCostPrice'] as num?)?.toDouble(),
       rawSellingPrice: (product?['rawSellingPrice'] as num?)?.toDouble(),
+      rawTotalCost: (product?['rawTotalCost'] as num?)?.toDouble(),
       rawStockQuantity: (product?['rawStockQuantity'] as num?)?.toInt(),
       rawLowStockThreshold:
           (product?['rawLowStockThreshold'] as num?)?.toInt(),
@@ -161,114 +184,3 @@ class _ProductDetailsData {
   }
 }
 
-class _Header extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Image.asset(
-          'assets/images/logo.png',
-          width: 48,
-          height: 48,
-          fit: BoxFit.contain,
-        ),
-        const Text(
-          'Product Details',
-          style: TextStyle(
-            color: Color(0xFF272A2F),
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            width: 58,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEEAB8),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LowStockBadge extends StatelessWidget {
-  const _LowStockBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFE3E3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Text(
-        'Low Stock',
-        style: TextStyle(
-          color: Color(0xFFE68888),
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailField extends StatelessWidget {
-  const _DetailField({
-    required this.label,
-    required this.value,
-    this.isLowStock = false,
-  });
-
-  final String label;
-  final String value;
-  final bool isLowStock;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF6C7078),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 36,
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            border: Border.all(color: isLowStock ? const Color(0xFFE68888) : const Color(0xFFC9CED6)),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            value,
-            style: TextStyle(
-              color: isLowStock ? const Color(0xFFE68888) : const Color(0xFF272A2F),
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}

@@ -21,16 +21,19 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
   @override
   void initState() {
     super.initState();
+    // Start the camera as soon as the screen opens.
     _initializeCamera();
   }
 
   @override
   void dispose() {
+    // Release camera and ML Kit resources when the screen is closed.
     _controller?.dispose();
     _scannerService.dispose();
     super.dispose();
   }
 
+  // Asks the service to open the camera; stores the controller or shows an error.
   Future<void> _initializeCamera() async {
     try {
       final controller = await _scannerService.initializeCamera();
@@ -49,6 +52,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     }
   }
 
+  // Called when the user taps "Capture Barcode".
+  // Prevents double-tapping while a scan is already in progress.
   Future<void> _scanImage() async {
     final controller = _controller;
     if (controller == null || _isProcessing) {
@@ -66,6 +71,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
       if (!mounted) return;
 
       if (value == null) {
+        // Nothing detected — let the user try again without closing the screen.
         setState(() {
           _error = 'No barcode detected. Please try again.';
           _isProcessing = false;
@@ -73,6 +79,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         return;
       }
 
+      // Pop the route and pass the barcode string back to AddProductScreen.
       context.pop(value);
     } catch (_) {
       if (!mounted) return;

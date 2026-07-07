@@ -2,6 +2,7 @@ part of 'add_product_screen.dart';
 
 /// Barcode and invoice scanning flows for [AddProductScreen].
 mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
+  // Shows a dialog asking whether the user wants to scan a barcode or an invoice.
   Future<void> _showScanOptions() async {
     await showDialog<void>(
       context: context,
@@ -26,6 +27,10 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
     );
   }
 
+  // Navigates to BarcodeScannerScreen and waits for it to return a barcode string.
+  // Once returned, looks up the barcode in the backend:
+  //   - Found → pre-fills the form with the existing product data.
+  //   - Not found → asks the user if they want to add it as a new product.
   Future<void> _handleBarcodeScan() async {
     final barcode = await context.push<String>(AppRoutes.barcodeScanner);
     if (!mounted || barcode == null || barcode.trim().isEmpty) {
@@ -37,10 +42,12 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
       final product = response['product'];
 
       if (response['found'] == true && product is Map<String, dynamic>) {
+        // Product already exists — fill the form so the user can review and update it.
         _applyProductPrefill(product);
         _showError('Product found. Review details before saving.');
       } else {
         if (!mounted) return;
+        // No match in inventory — ask if they want to create a new product.
         final addNew = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -60,6 +67,7 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
         );
 
         if (addNew == true && mounted) {
+          // Clear the form and pre-fill only the barcode field.
           setState(() {
             _selectedProductId = null;
             _productNameLockedBySelection = false;
@@ -82,7 +90,9 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
     }
   }
 
+  // Full invoice scan flow: pick image → OCR → parse → match against inventory → review.
   Future<void> _handleInvoiceScan() async {
+    // Step 1: ask the user whether to use the camera or pick a file.
     InvoiceImageSource? source;
     await showDialog<void>(
       context: context,
@@ -105,20 +115,23 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
     );
 
     if (source == null) {
-      return;
+      return; // User cancelled the dialog.
     }
 
+    // Show a loading overlay while OCR and parsing run.
     setState(() {
       _isSavingProduct = true;
       _isProcessingInvoice = true;
     });
 
     try {
+      // Step 2: open camera or file picker and get the local file path.
       final filePath = await _invoiceScanService.pickInvoiceFilePath(source: source!);
       if (filePath == null) {
-        return;
+        return; // User cancelled the picker.
       }
 
+      // Step 3: run ML Kit OCR on the file (handles rotation, PDFs, etc.).
       final recognizedText = await _invoiceScanService.recognizeFromFilePath(
         filePath,
       );
@@ -127,6 +140,7 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
       debugPrint(recognizedText.text);
       debugPrint('====================');
 
+      // Step 4: parse the OCR result into structured product data.
       final parser = InvoiceOcrParser();
       final parsed = parser.parseRecognizedText(recognizedText);
 
@@ -144,6 +158,8 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
         return;
       }
 
+      // Step 5: send parsed products to the backend which fuzzy-matches each
+      // name against the business's existing inventory.
       final response = await _apiService.matchScannedProducts(
         products: parsed.products
             .map((p) => p.toJson())
@@ -163,6 +179,8 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
         return;
       }
 
+      // Step 6: navigate to the review screen where the user can confirm or edit
+      // each matched product before it is saved to inventory.
       if (!mounted) return;
       await context.push(
         AppRoutes.reviewScannedProducts,
@@ -178,6 +196,7 @@ mixin _AddProductScanMixin on State<AddProductScreen>, _AddProductFormMixin {
         _showError(error.toString());
       }
     } finally {
+      // Always hide the loading overlay, even if an error occurred.
       if (mounted) {
         setState(() {
           _isSavingProduct = false;

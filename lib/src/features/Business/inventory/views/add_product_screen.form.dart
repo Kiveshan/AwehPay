@@ -14,6 +14,9 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   late final TextEditingController _barcodeController;
   late final TextEditingController _costPriceController;
   late final TextEditingController _sellingPriceController;
+  late final TextEditingController _totalCostController;
+  bool _vatEnabled = false;
+  bool _skipTotalCostAutoCalc = false;
   late final TextEditingController _quantityController;
   late final TextEditingController _alertQuantityController;
   bool _hasScannedBarcode = false;
@@ -21,9 +24,17 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   bool _productNameLockedBySelection = false;
   String? _selectedProductId;
   String? _selectedCategory;
+  int? _existingStockQuantity;
   List<String> _productOptions = [];
   List<String> _categoryOptions = ['Other'];
   final Map<String, Map<String, dynamic>> _productDataByName = {};
+
+  // Returns the current stock to add on top of when updating, or null for new products.
+  int? get _effectiveExistingStock {
+    if (widget.isReplenishStock) return widget.prefillStockQuantity;
+    if (_selectedProductId != null) return _existingStockQuantity;
+    return null;
+  }
 
   void _applyProductPrefill(Map<String, dynamic> product) {
     _fillFromProductMap(product, lockSelection: true);
@@ -33,10 +44,13 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
     Map<String, dynamic> product, {
     required bool lockSelection,
   }) {
+    _skipTotalCostAutoCalc = true;
     setState(() {
       _selectedProductId = product['productId'] as String?;
+      _existingStockQuantity = (product['stockQuantity'] as num?)?.toInt();
       _productNameLockedBySelection = lockSelection;
-      _hasScannedBarcode = true;
+      final barcode = (product['barcode'] as String?) ?? '';
+      _hasScannedBarcode = barcode.isNotEmpty;
       _productNameController.text = (product['name'] as String?) ?? '';
       final productCategory = (product['category'] as String?) ?? '';
       if (productCategory.isNotEmpty && _categoryOptions.contains(productCategory)) {
@@ -49,12 +63,29 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         _selectedCategory = null;
         _categoryController.clear();
       }
-      _barcodeController.text = (product['barcode'] as String?) ?? '';
+      _barcodeController.text = barcode;
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
-      _quantityController.text = '${product['stockQuantity'] ?? ''}';
+      final rawTotalCost = (product['totalCost'] as num?)?.toDouble() ?? 0.0;
+      _totalCostController.text = rawTotalCost > 0 ? rawTotalCost.toStringAsFixed(2) : '';
+      _vatEnabled = (product['vat'] as bool?) ?? false;
+      // Clear quantity so the user enters how much they are adding, not the total.
+      _quantityController.clear();
       _alertQuantityController.text = '${product['lowStockThreshold'] ?? ''}';
     });
+    _skipTotalCostAutoCalc = false;
+  }
+
+  void _recalculateTotalCost() {
+    if (_skipTotalCostAutoCalc) return;
+    final costPrice = _parseMoney(_costPriceController.text) ?? 0.0;
+    final qty = int.tryParse(_quantityController.text.trim()) ?? 0;
+    var total = costPrice * qty;
+    if (_vatEnabled) total *= 1.15;
+    final newText = total > 0 ? total.toStringAsFixed(2) : '';
+    if (_totalCostController.text != newText) {
+      _totalCostController.text = newText;
+    }
   }
 
   void _changeIntField(TextEditingController controller, int delta) {
@@ -76,6 +107,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         : (_selectedCategory ?? '');
     final costPrice = _parseMoney(_costPriceController.text);
     final sellingPrice = _parseMoney(_sellingPriceController.text);
+    final totalCost = _parseMoney(_totalCostController.text) ?? 0.0;
     final stockQuantity = int.tryParse(_quantityController.text.trim());
     final lowStockThreshold =
         int.tryParse(_alertQuantityController.text.trim());
@@ -92,11 +124,12 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       return;
     }
 
-    // In replenish mode, the entered quantity is ADDED to the existing stock
-    // already stored for this product rather than replacing it.
-    final effectiveStockQuantity = widget.isReplenishStock
-        ? (widget.prefillStockQuantity ?? 0) + stockQuantity
-        : stockQuantity;
+    // When updating an existing product, the entered quantity is ADDED to the
+    // current stock rather than replacing it (covers replenish mode, barcode
+    // lookup, and manual autocomplete selection).
+    final existingStock = _effectiveExistingStock;
+    final effectiveStockQuantity =
+        existingStock != null ? existingStock + stockQuantity : stockQuantity;
 
     setState(() {
       _isSavingProduct = true;
@@ -109,6 +142,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
+          totalCost: totalCost,
+          vat: _vatEnabled,
           stockQuantity: effectiveStockQuantity,
           lowStockThreshold: lowStockThreshold,
           category: category,
@@ -119,6 +154,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
+          totalCost: totalCost,
+          vat: _vatEnabled,
           stockQuantity: effectiveStockQuantity,
           category: category,
           lowStockThreshold: lowStockThreshold,
@@ -209,6 +246,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       setState(() {
         _isProductAdded = false;
         _selectedProductId = null;
+        _existingStockQuantity = null;
         _productNameLockedBySelection = false;
         _hasScannedBarcode = false;
         _selectedCategory = null;
@@ -217,6 +255,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         _barcodeController.clear();
         _costPriceController.clear();
         _sellingPriceController.clear();
+        _totalCostController.clear();
+        _vatEnabled = false;
         _quantityController.clear();
         _alertQuantityController.clear();
       });

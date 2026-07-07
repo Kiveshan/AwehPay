@@ -2,7 +2,12 @@ part of 'invoice_ocr_parser.dart';
 
 // Visual-row (bounding-box) based parsing of structured/table invoices.
 
+// Preferred parsing strategy. Uses the pixel coordinates ML Kit returns for
+// each text line to reconstruct the table structure of the invoice, then
+// extracts one product per visual row.
 List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
+  // Flatten all ML Kit blocks/lines into our own lightweight model that
+  // keeps the bounding box alongside the text.
   final ocrLines = <_OcrTextLine>[];
   for (final block in recognizedText.blocks) {
     for (final line in block.lines) {
@@ -21,6 +26,7 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
 
   if (ocrLines.isEmpty) return [];
 
+  // Sort top-to-bottom so we process the invoice in reading order.
   ocrLines.sort((a, b) => a.centerY.compareTo(b.centerY));
 
   // Group OCR lines into visual rows. Max tolerance 50px covers moderate
@@ -32,8 +38,10 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
       continue;
     }
     final previous = rows.last;
+    // Scale the tolerance to the line height so small text uses a smaller gap.
     final tolerance = (line.height * 0.9).clamp(12.0, 50.0);
     if ((line.centerY - previous.centerY).abs() <= tolerance) {
+      // Same visual row — merge this OCR line into the existing row.
       previous.lines.add(line);
     } else {
       rows.add(_OcrVisualRow([line]));
@@ -41,19 +49,23 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
   }
 
   final products = <ScannedProduct>[];
+  // Track rows already merged with a neighbour so they aren't processed twice.
   final consumed = <int>{};
 
   for (var i = 0; i < rows.length; i++) {
     if (consumed.contains(i)) continue;
 
     final rowText = rows[i].text;
+
+    // Skip rows that are totals, VAT lines, date rows, headers, etc.
     if (_isSummaryRow(rowText)) continue;
 
     // Collect ALL money values in the row — needed for table-format detection.
     var allPrices = _extractAllMoneyValues(rowText);
 
-    // Orphan recovery pass A: no price here, check if next row is price-only
-    // OR has a leading QTY integer followed by prices (e.g. "5 15.00 75.00").
+    // Orphan recovery pass A: this row has no price — check the next row.
+    // Some invoices print the price on a separate line below the product name,
+    // or the narrow QTY column lands on its own row as "QTY UNIT LINE_TOTAL".
     int? orphanQty;
     if (allPrices.isEmpty && i + 1 < rows.length && !consumed.contains(i + 1)) {
       final nextText = rows[i + 1].text;
@@ -61,6 +73,7 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
         final nextPrices = _extractAllMoneyValues(nextText);
         final nextResidue = _removeMoneyValues(nextText).trim();
         if (nextPrices.isNotEmpty && nextResidue.isEmpty) {
+          // Next row is price-only — pair it with this name row.
           allPrices = nextPrices;
           consumed.add(i + 1);
         } else if (nextPrices.isNotEmpty && RegExp(r'^\d+$').hasMatch(nextResidue)) {
@@ -77,10 +90,10 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
 
     if (allPrices.isEmpty) continue;
 
-    // Always use the LAST money value as the cost price (line total on
-    // structured invoices).
+    // Always use the LAST money value as the price (line total on structured invoices).
     final namePortion = _removeMoneyValues(rowText);
     var price = allPrices.last;
+    double? lineTotal;
 
     // When two prices are present (unit price + line total), derive qty from
     // their ratio. OCR frequently misses or garbles the narrow QTY column,
@@ -89,25 +102,28 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
     int? calculatedQty;
     if (allPrices.length >= 2) {
       final unitPrice = allPrices[allPrices.length - 2];
-      final lineTotal = allPrices.last;
+      final rawLineTotal = allPrices.last;
       if (unitPrice > 0) {
-        if (lineTotal < unitPrice * 0.9) {
-          // Line total is lower than the unit price — impossible for qty≥1,
-          // so the line total column was OCR-corrupted (e.g. "R4,999.99"
-          // partially read as "R4.99"). Fall back to unit price, qty=1.
+        if (rawLineTotal < unitPrice * 0.9) {
+          // Line total lower than unit price — OCR-corrupted. Fall back to unit price, qty=1.
           price = unitPrice;
           calculatedQty = 1;
         } else {
-          final ratio = lineTotal / unitPrice;
+          // qty = lineTotal / unitPrice, rounded to the nearest integer.
+          final ratio = rawLineTotal / unitPrice;
           final rounded = ratio.round();
           if (rounded >= 1 &&
               rounded <= 999 &&
               (ratio - rounded).abs() / rounded < 0.02) {
             calculatedQty = rounded;
+            price = unitPrice;       // use unit price as costPrice
+            lineTotal = rawLineTotal; // remember the line total
           }
         }
       }
     }
+
+    // Priority: explicit orphan qty > ratio-derived qty > standalone integer in name.
     final tableQty = orphanQty ?? calculatedQty ?? _extractTableQuantity(namePortion);
 
     // Apply ignore checks only to the name portion (not full row text) to
@@ -116,8 +132,8 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
 
     var name = namePortion;
 
-    // Remove the extracted table qty number from the name so it doesn't
-    // pollute the product name field.
+    // Remove the qty number from the name portion so "Bread 3 R45.00"
+    // doesn't produce a name of "Bread 3".
     if (tableQty != null) {
       name = name
           .replaceFirst(
@@ -132,7 +148,8 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
     var quantity = _extractQuantity(name) ?? tableQty;
     name = _removeQuantityText(name);
 
-    // Extend name with detail text from subsequent no-price rows.
+    // Some invoices split a product across two rows (e.g. description on row 1,
+    // variant detail on row 2 with no price). Absorb up to 2 trailing detail rows.
     for (var offset = 1; offset <= 2 && i + offset < rows.length; offset++) {
       if (consumed.contains(i + offset)) break;
       final detailText = rows[i + offset].text;
@@ -151,19 +168,22 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
       name: name,
       quantity: quantity ?? 1,
       costPrice: price,
+      totalCost: lineTotal ?? 0.0,
       confidence: 0.9,
     );
     if (product != null) products.add(product);
   }
 
-  // Orphan recovery pass B: price-only rows that weren't consumed get paired
-  // with the nearest preceding name-only row.
+  // Orphan recovery pass B: any price-only rows not yet consumed are paired
+  // with the nearest preceding name-only row (within 3 rows).
   for (var i = 1; i < rows.length; i++) {
     if (consumed.contains(i)) continue;
     final rowText = rows[i].text;
     if (_isSummaryRow(rowText)) continue;
     final prices = _extractAllMoneyValues(rowText);
     final residue = _removeMoneyValues(rowText).trim();
+
+    // Only process rows that contain only prices and nothing else.
     if (prices.isEmpty || residue.isNotEmpty) continue;
 
     for (var j = i - 1; j >= 0 && j >= i - 3; j--) {
@@ -194,13 +214,9 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
   return products;
 }
 
-/// Finds a standalone integer in [nameText] that is plausibly a Qty column
-/// value — not embedded inside a product code, SKU, or unit suffix like
-/// "700g", "2L", "18s".  Returns the LAST such number (closest to the price
-/// columns) that is between 1 and 999.
-///
-/// Uses word-splitting rather than regex lookahead/lookbehind so that "700g"
-/// is never split into "70" + "0g" by the regex engine.
+// Finds a standalone integer in [nameText] that is plausibly a Qty column value.
+// Searches right-to-left (closest to the price columns) and skips numbers
+// embedded in product codes ("700g", "2L"), years ("2024"), and date contexts.
 int? _extractTableQuantity(String nameText) {
   final words = nameText.trim().split(RegExp(r'\s+'));
   final pureInt = RegExp(r'^\d+$');
@@ -208,6 +224,7 @@ int? _extractTableQuantity(String nameText) {
     r'^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$',
     caseSensitive: false,
   );
+
   // Search right-to-left for a pure integer that is NOT part of a date
   // (e.g. skip "19" when the next word is "June").
   for (var i = words.length - 1; i >= 0; i--) {
@@ -223,12 +240,10 @@ int? _extractTableQuantity(String nameText) {
   return null;
 }
 
-/// Ignore check used inside [_parseVisualRows] — applied only to the
-/// name portion (money values already removed), NOT to the full row text.
-///
-/// Uses word-boundary matching for keywords that legitimately appear inside
-/// product codes and reference numbers (excl, incl, date, amount, price)
-/// to avoid false positives from reference column text.
+// Ignore check used inside visual-row parsing — applied only to the name
+// portion after money values have been stripped out.
+// Uses word-boundary matching for keywords that can legitimately appear inside
+// product codes (excl, incl, amount, price) to avoid false positives.
 bool _shouldIgnoreInVisualRow(String namePortion) {
   final v = namePortion.toLowerCase().trim();
   if (v.isEmpty) return true;
@@ -256,9 +271,9 @@ bool _shouldIgnoreInVisualRow(String namePortion) {
       v.contains('unit pric') ||
       v.contains('line total') ||
       v.contains('line tot') ||
-      // Date rows — month names indicate a date string, not a product
+      // Date rows — a month name here means this is a date, not a product.
       RegExp(r'\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b').hasMatch(v) ||
-      // Four-digit year (2020–2099) almost never appears in a product name
+      // Four-digit year (2020–2099) almost never appears in a product name.
       RegExp(r'\b20[2-9]\d\b').hasMatch(v)) {
     return true;
   }

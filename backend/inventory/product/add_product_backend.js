@@ -3,6 +3,7 @@ const admin = require('firebase-admin');
 
 const {
   normalizeName,
+  resolveBusinessContext,
 } = require('../service/inventory_helpers');
 
 const router = express.Router();
@@ -77,6 +78,8 @@ router.post('/add-product', async (req, res) => {
       barcode,
       costPrice,
       sellingPrice,
+      totalCost,
+      vat,
       stockQuantity,
       category,
       lowStockThreshold,
@@ -99,17 +102,14 @@ router.post('/add-product', async (req, res) => {
       return res.status(400).json({ error: 'Valid prices, quantity, and low stock threshold are required' });
     }
 
-    const decodedToken = await auth.verifyIdToken(idToken);
-    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    const businessId = userDoc.data()?.businessId;
-
-    if (!businessId) {
-      return res.status(400).json({ error: 'No business is linked to this account' });
-    }
+    const { businessId, uid } = await resolveBusinessContext({ auth, db, idToken });
 
     const businessRef = db.collection('businesses').doc(businessId);
     const productRef = businessRef.collection('products').doc();
+    const movementRef = businessRef.collection('stockMovements').doc();
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const resolvedTotalCost = typeof totalCost === 'number' ? totalCost : 0;
+    const resolvedVat = vat === true;
 
     await db.runTransaction(async (transaction) => {
       transaction.set(productRef, {
@@ -120,6 +120,8 @@ router.post('/add-product', async (req, res) => {
         barcode: typeof barcode === 'string' ? barcode.trim() : '',
         costPrice,
         sellingPrice,
+        totalCost: resolvedTotalCost,
+        vat: resolvedVat,
         stockQuantity,
         category: category.trim(),
         lowStockThreshold,
@@ -136,6 +138,23 @@ router.post('/add-product', async (req, res) => {
       transaction.update(businessRef, {
         'totals.totalProducts': admin.firestore.FieldValue.increment(1),
         updatedAt: now,
+      });
+      transaction.set(movementRef, {
+        movementId: movementRef.id,
+        businessId,
+        createdAt: now,
+        createdBy: uid,
+        productId: productRef.id,
+        productName: name.trim(),
+        type: 'initial_stock',
+        previousQuantity: 0,
+        newQuantity: stockQuantity,
+        quantity: stockQuantity,
+        reason: 'Initial stock',
+        referenceId: null,
+        referenceType: 'manual',
+        total: resolvedTotalCost,
+        vat: resolvedVat,
       });
     });
 

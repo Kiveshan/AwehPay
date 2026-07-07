@@ -2,7 +2,9 @@ part of 'invoice_ocr_parser.dart';
 
 // Shared regex/normalisation helpers used across the parser.
 
-/// Returns every parseable money value found in [text], in left-to-right order.
+// Finds every price-like value in [text] and returns them as doubles in order.
+// The regex handles all common South African price formats including R-prefix,
+// space/comma/dot separators, and OCR misreads like "o" for "0".
 List<double> _extractAllMoneyValues(String text) {
   return RegExp(
     r'R\s*\d{1,3}[.,]\d{3}[.,]\d{2}|R\s*\d+[.,]\d[oO]\b|R\s*\d{2,3}\s\d{2}\b|R\s*\d{1,3}(?:,\d{3})+\.\d{2}|R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
@@ -14,9 +16,13 @@ List<double> _extractAllMoneyValues(String text) {
       .toList();
 }
 
-// Normalises an SA price string to a parseable double.
+// Converts a raw South African price string to a double.
+// Handles the many ways OCR and different invoice styles encode prices:
+//   "R 4,999.99", "R4.999.99" (OCR period-as-separator), "699 98" (space decimal),
+//   "2 625,00" (space-thousands comma-decimal), "399.0o" (OCR o/O for 0).
 double? _parseSaPrice(String raw) {
   var s = raw.replaceAll(RegExp(r'^R\s*', caseSensitive: false), '').trim();
+
   // OCR reads "R 4,999.99" as "R4.999.99" — period used for both separators.
   // Strip the first separator (thousands) to get "4999.99".
   if (RegExp(r'^\d{1,3}[.,]\d{3}[.,]\d{2}$').hasMatch(s)) {
@@ -24,20 +30,24 @@ double? _parseSaPrice(String raw) {
     s = s.substring(0, firstSep) + s.substring(firstSep + 1);
     return double.tryParse(s.replaceAll(',', '.'));
   }
+
   // OCR misreads "0" as "o"/"O" at end of decimal: "399.0o" → "399.00".
   s = s.replaceAllMapped(
     RegExp(r'([.,]\d)[oO]$'),
     (m) => '${m.group(1)}0',
   );
-  // Space as decimal separator (2-3 digit integer part only, to avoid
+
+  // Space as decimal separator (2–3 digit integer part only, to avoid
   // confusion with space-thousands format): "699 98" → 699.98.
   if (RegExp(r'^\d{2,3}\s\d{2}$').hasMatch(s)) {
     return double.tryParse(s.replaceFirst(' ', '.'));
   }
+
   // Comma-thousands, dot-decimal: "4,999.99"
   if (RegExp(r'^\d{1,3}(?:,\d{3})+\.\d{2}$').hasMatch(s)) {
     return double.tryParse(s.replaceAll(',', ''));
   }
+
   // Space-thousands, comma-decimal: "2 625,00"
   if (RegExp(r'\d,\d{2}$').hasMatch(s)) {
     s = s.replaceAll(' ', '').replaceAll(',', '.');
@@ -47,6 +57,8 @@ double? _parseSaPrice(String raw) {
   return double.tryParse(s);
 }
 
+// Convenience wrapper — returns just the last money value found in the text,
+// which on table-style invoices is the line total.
 double? _extractLastMoneyValue(String text) {
   final matches = RegExp(
     r'R\s*\d{1,3}[.,]\d{3}[.,]\d{2}|R\s*\d+[.,]\d[oO]\b|R\s*\d{2,3}\s\d{2}\b|R\s*\d{1,3}(?:,\d{3})+\.\d{2}|R\s*\d{1,3}(?:\s\d{3})*[.,]\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\s\d{3})+[.,]\d{2}|\d+[.,]\d{2}',
@@ -60,6 +72,8 @@ double? _extractLastMoneyValue(String text) {
   return _parseSaPrice(matches.last.group(0)!);
 }
 
+// Strips all money values out of [text], leaving only the non-price portions
+// (typically the product name and quantity). Used to isolate the name column.
 String _removeMoneyValues(String text) {
   return text
       .replaceAll(
@@ -73,6 +87,8 @@ String _removeMoneyValues(String text) {
       .trim();
 }
 
+// Extracts an "x-pattern" quantity from text, e.g. "3x" or "x 3".
+// Returns null if no such pattern is found.
 int? _extractQuantity(String text) {
   final match = RegExp(
     r'(?:^|\s)(?:x\s*(\d+)|(\d+)\s*x)(?:\s|$)',
@@ -86,6 +102,8 @@ int? _extractQuantity(String text) {
   return int.tryParse(match.group(1) ?? match.group(2) ?? '');
 }
 
+// Removes the "x-pattern" quantity token from text so it doesn't end up
+// in the product name (e.g. "Bread 3x" → "Bread").
 String _removeQuantityText(String text) {
   return text
       .replaceAll(
@@ -96,6 +114,8 @@ String _removeQuantityText(String text) {
       .trim();
 }
 
+// Returns true if this row is a summary/header/footer line that should never
+// be treated as a product — totals, VAT, subtotals, dates, banking details, etc.
 bool _isSummaryRow(String text) {
   final value = text.toLowerCase();
   return value.contains('subtotal') ||
@@ -113,10 +133,14 @@ bool _isSummaryRow(String text) {
       value.startsWith('vat') ||
       value.contains(' vat ') ||
       RegExp(r'\bvat\b').hasMatch(value) ||
+      // Month names indicate a date row.
       RegExp(r'\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b').hasMatch(value) ||
+      // Four-digit years (2020–2099) signal a date, not a product.
       RegExp(r'\b20[2-9]\d\b').hasMatch(value);
 }
 
+// Broader ignore list used by the text-line parser.
+// Covers all header/footer/summary keywords that should never be product names.
 bool _shouldIgnore(String line) {
   final value = line.toLowerCase();
   return value.contains('subtotal') ||
@@ -164,9 +188,9 @@ bool _shouldIgnore(String line) {
       value.contains('sub tot');
 }
 
-/// Returns true when a name is clearly OCR garbage — e.g. the price column
-/// read sideways produces names like "R R R R R R R1 R12 6M SHIPMENT 08"
-/// where the majority of tokens are currency/number fragments.
+// Returns true when a name is clearly OCR garbage — e.g. the price column
+// read sideways produces names like "R R R R R R R1 R12 6M SHIPMENT 08"
+// where the majority of tokens are currency/number fragments.
 bool _isGarbageName(String name) {
   final words = name.split(RegExp(r'\s+'));
   if (words.isEmpty) return true;
@@ -174,15 +198,20 @@ bool _isGarbageName(String name) {
     return RegExp(r'^R\d*$', caseSensitive: false).hasMatch(w) ||
         RegExp(r'^\d+$').hasMatch(w);
   }).length;
+  // Reject if more than 55% of tokens are currency/number fragments.
   return junkCount / words.length > 0.55;
 }
 
+// Final step for every candidate product: strips OCR noise from the name,
+// validates the values, and constructs a ScannedProduct or returns null.
 ScannedProduct? _buildProduct({
   required String name,
   required int quantity,
   required double costPrice,
+  double totalCost = 0.0,
   required double confidence,
 }) {
+  // Remove all characters that aren't letters, digits, spaces, or common punctuation.
   var cleanedName = name
       .replaceAll(RegExp(r'[^A-Za-z0-9\s\-_/]'), '')
       .replaceAll(RegExp(r'\s+'), ' ')
@@ -199,9 +228,8 @@ ScannedProduct? _buildProduct({
       )
       .trim();
 
-  // Strip leading or trailing SKU / code column like "SKU-1001", "PROD-A12".
-  // Pattern: 1-6 letters, hyphen, 1-10 alphanumeric chars.
-  // This intentionally does NOT match bare product codes without a hyphen
+  // Strip leading or trailing SKU/code columns like "SKU-1001" or "PROD-A12".
+  // Intentionally does NOT match bare product codes without a hyphen
   // (e.g. "TCUJ3176418") so those are kept as the product name.
   cleanedName = cleanedName
       .replaceFirst(RegExp(r'^[A-Za-z]{1,6}-[A-Za-z0-9]{1,10}\s+'), '')
@@ -209,12 +237,12 @@ ScannedProduct? _buildProduct({
       .trim();
 
   // Strip trailing column-header fragments that bleed into the name row
-  // (e.g. "…Eggs Large 18s SKU" or "…Bread CODE").
+  // (e.g. "Eggs Large 18s SKU" or "Bread CODE").
   cleanedName = cleanedName
       .replaceAll(RegExp(r'\s+(?:SKU|CODE|REF|ITEM)\s*$', caseSensitive: false), '')
       .trim();
 
-  // Remove leftover standalone currency prefix "R" tokens (e.g. "R POLYFIBRO" → "POLYFIBRO").
+  // Remove leftover standalone "R" currency prefix tokens (e.g. "R POLYFIBRO" → "POLYFIBRO").
   cleanedName = cleanedName
       .replaceAll(RegExp(r'\bR\b\s*', caseSensitive: false), '')
       .replaceAll(RegExp(r'\s+'), ' ')
@@ -231,8 +259,7 @@ ScannedProduct? _buildProduct({
     return null;
   }
 
-  // Reject names that are clearly OCR garbage from a rotated price column —
-  // e.g. "R R R R R R R1 R12" where most tokens are currency fragments.
+  // Reject names that are clearly OCR garbage from a rotated price column.
   if (_isGarbageName(cleanedName)) {
     return null;
   }
@@ -241,6 +268,7 @@ ScannedProduct? _buildProduct({
     name: cleanedName,
     quantity: quantity,
     costPrice: costPrice,
+    totalCost: totalCost,
     category: 'Other',
     confidence: confidence,
   );

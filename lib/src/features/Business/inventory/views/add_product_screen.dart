@@ -31,6 +31,8 @@ class AddProductScreen extends StatefulWidget {
     this.prefillBarcode,
     this.prefillCostPrice,
     this.prefillSellingPrice,
+    this.prefillTotalCost,
+    this.prefillVat,
     this.prefillStockQuantity,
     this.prefillLowStockThreshold,
   });
@@ -42,6 +44,8 @@ class AddProductScreen extends StatefulWidget {
   final String? prefillBarcode;
   final double? prefillCostPrice;
   final double? prefillSellingPrice;
+  final double? prefillTotalCost;
+  final bool? prefillVat;
   final int? prefillStockQuantity;
   final int? prefillLowStockThreshold;
 
@@ -76,6 +80,12 @@ class _AddProductScreenState extends State<AddProductScreen>
           ? widget.prefillSellingPrice!.toStringAsFixed(2)
           : '',
     );
+    _totalCostController = TextEditingController(
+      text: widget.prefillTotalCost != null
+          ? widget.prefillTotalCost!.toStringAsFixed(2)
+          : '',
+    );
+    _vatEnabled = widget.prefillVat ?? false;
     _quantityController = TextEditingController(
       // In replenish mode the field represents the quantity being ADDED, so it
       // starts empty; the existing stock is added to it on save.
@@ -100,6 +110,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           setState(() {
             _productNameLockedBySelection = false;
             _selectedProductId = null;
+            _existingStockQuantity = null;
             _selectedCategory = null;
             _categoryController.clear();
             _costPriceController.clear();
@@ -122,6 +133,8 @@ class _AddProductScreenState extends State<AddProductScreen>
         }
       }
     });
+    _costPriceController.addListener(_recalculateTotalCost);
+    _quantityController.addListener(_recalculateTotalCost);
     _loadProductOptions();
   }
 
@@ -133,6 +146,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     _barcodeController.dispose();
     _costPriceController.dispose();
     _sellingPriceController.dispose();
+    _totalCostController.dispose();
     _quantityController.dispose();
     _alertQuantityController.dispose();
     super.dispose();
@@ -171,6 +185,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                             hasScannedBarcode: _hasScannedBarcode,
                             lockedProductName: widget.lockedProductName,
                             lockedCategory: widget.lockedCategory,
+                            existingStockQuantity: _effectiveExistingStock,
                             productOptions: _productOptions,
                             categoryOptions: _categoryOptions,
                             selectedCategory: _selectedCategory,
@@ -187,6 +202,14 @@ class _AddProductScreenState extends State<AddProductScreen>
                             barcodeController: _barcodeController,
                             costPriceController: _costPriceController,
                             sellingPriceController: _sellingPriceController,
+                            totalCostController: _totalCostController,
+                            vatEnabled: _vatEnabled,
+                            onVatChanged: (value) {
+                              setState(() {
+                                _vatEnabled = value ?? false;
+                              });
+                              _recalculateTotalCost();
+                            },
                             quantityController: _quantityController,
                             alertQuantityController: _alertQuantityController,
                             onProductOptionSelected: (name) {

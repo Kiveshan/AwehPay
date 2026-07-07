@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/widgets/editable_option_field.dart';
+
+part 'add_product_form.widgets.dart';
 import '../../../../../core/widgets/inventory_input_field.dart';
 import '../../../../../core/widgets/product_added_status.dart';
 import '../../../../../core/widgets/save_button.dart';
@@ -13,6 +15,7 @@ class AddProductForm extends StatelessWidget {
     required this.hasScannedBarcode,
     required this.lockedProductName,
     required this.lockedCategory,
+    this.existingStockQuantity,
     required this.productOptions,
     required this.categoryOptions,
     required this.selectedCategory,
@@ -22,6 +25,9 @@ class AddProductForm extends StatelessWidget {
     required this.barcodeController,
     required this.costPriceController,
     required this.sellingPriceController,
+    required this.totalCostController,
+    required this.vatEnabled,
+    required this.onVatChanged,
     required this.quantityController,
     required this.alertQuantityController,
     required this.onProductOptionSelected,
@@ -37,6 +43,7 @@ class AddProductForm extends StatelessWidget {
   final bool hasScannedBarcode;
   final String? lockedProductName;
   final String? lockedCategory;
+  final int? existingStockQuantity;
 
   final List<String> productOptions;
   final List<String> categoryOptions;
@@ -48,6 +55,9 @@ class AddProductForm extends StatelessWidget {
   final TextEditingController barcodeController;
   final TextEditingController costPriceController;
   final TextEditingController sellingPriceController;
+  final TextEditingController totalCostController;
+  final bool vatEnabled;
+  final ValueChanged<bool?> onVatChanged;
   final TextEditingController quantityController;
   final TextEditingController alertQuantityController;
 
@@ -116,19 +126,43 @@ class AddProductForm extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: InventoryInputField(
-                  label: 'Quantity',
-                  labelColor: null,
-                  borderColor: null,
-                  textColor: null,
-                  controller: quantityController,
-                  keyboardType: TextInputType.number,
-                  spinnerColor: const Color(0xFFDFA890),
-                  readOnly: isProductAdded,
-                  onIncrement: isProductAdded ? null : onIncrementQuantity,
-                  onDecrement: isProductAdded ? null : onDecrementQuantity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InventoryInputField(
+                      label: existingStockQuantity != null ? 'Quantity to Add' : 'Quantity',
+                      labelColor: null,
+                      borderColor: null,
+                      textColor: null,
+                      controller: quantityController,
+                      keyboardType: TextInputType.number,
+                      spinnerColor: const Color(0xFFDFA890),
+                      readOnly: isProductAdded,
+                      onIncrement: isProductAdded ? null : onIncrementQuantity,
+                      onDecrement: isProductAdded ? null : onDecrementQuantity,
+                    ),
+                    if (existingStockQuantity != null) ...[
+                      const SizedBox(height: 4),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: quantityController,
+                        builder: (context, value, _) {
+                          final entered = int.tryParse(value.text.trim()) ?? 0;
+                          final newTotal = existingStockQuantity! + entered;
+                          return Text(
+                            'Current: $existingStockQuantity  ·  New total: $newTotal',
+                            style: const TextStyle(
+                              color: Color(0xFFDFA890),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: 28),
@@ -150,6 +184,56 @@ class AddProductForm extends StatelessWidget {
               readOnly: isProductAdded,
             ),
           ],
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: InventoryInputField(
+                  label: 'Total Cost',
+                  controller: totalCostController,
+                  keyboardType: TextInputType.number,
+                  prefixText: 'R',
+                  readOnly: isProductAdded,
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'VAT',
+                      style: TextStyle(
+                        color: Color(0xFF272A2F),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: vatEnabled,
+                          onChanged: isProductAdded ? null : onVatChanged,
+                          activeColor: const Color(0xFFDFA890),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          vatEnabled ? 'VAT Included' : 'No VAT',
+                          style: const TextStyle(
+                            color: Color(0xFF272A2F),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 18),
           InventoryInputField(
             label: 'Alert me when stock reaches below',
@@ -175,63 +259,3 @@ class AddProductForm extends StatelessWidget {
   }
 }
 
-class _CategoryDropdown extends StatelessWidget {
-  const _CategoryDropdown({
-    required this.value,
-    required this.options,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final String? value;
-  final List<String> options;
-  final bool enabled;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final safeValue = (value != null && options.contains(value)) ? value : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Product Category',
-          style: TextStyle(
-            color: Color(0xFF272A2F),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFC9CED6)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: safeValue,
-              isExpanded: true,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF272A2F),
-              ),
-              style: const TextStyle(color: Color(0xFF272A2F), fontSize: 13),
-              hint: const Text(
-                'Select a category',
-                style: TextStyle(color: Color(0xFF4A4E57), fontSize: 13),
-              ),
-              items: options
-                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                  .toList(),
-              onChanged: enabled ? onChanged : null,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}

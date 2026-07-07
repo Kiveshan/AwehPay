@@ -2,6 +2,10 @@ part of 'invoice_ocr_parser.dart';
 
 // Text-line based parsing of receipt/list-style invoices.
 
+// Used when only one item exists on the receipt ("item count - 1").
+// Scans every line for standalone price values, finds the value that
+// appears in both R-prefixed and plain form (the real total), then
+// picks the first all-text line as the product name.
 ScannedProduct? _parseSingleItemReceipt(List<String> lines) {
   final plainValues = <double, int>{};
   final rPrefixedValues = <double, int>{};
@@ -17,6 +21,7 @@ ScannedProduct? _parseSingleItemReceipt(List<String> lines) {
     if (match != null) {
       final value = double.tryParse(match.group(2)!);
       if (value != null && value > 0) {
+        // Track whether the price appeared with an "R" prefix or not.
         final bucket = match.group(1) != null ? rPrefixedValues : plainValues;
         bucket[value] = (bucket[value] ?? 0) + 1;
       }
@@ -39,6 +44,7 @@ ScannedProduct? _parseSingleItemReceipt(List<String> lines) {
   }
 
   if (price == null) {
+    // No overlapping value — fall back to the most frequently repeated price.
     final allValues = <double, int>{};
     for (final entry in plainValues.entries) {
       allValues[entry.key] = (allValues[entry.key] ?? 0) + entry.value;
@@ -58,6 +64,7 @@ ScannedProduct? _parseSingleItemReceipt(List<String> lines) {
     price = bestValue;
   }
 
+  // Find the first line with no digits that reads like a product name.
   String? name;
   for (final line in lines) {
     if (!RegExp(r'\d').hasMatch(line) && _looksLikeProductName(line)) {
@@ -78,6 +85,8 @@ ScannedProduct? _parseSingleItemReceipt(List<String> lines) {
   );
 }
 
+// Looks at the first 6 lines of the invoice for the supplier name.
+// Skips lines that are ignored keywords, start with a digit, or contain "invoice".
 String _extractSupplierName(List<String> lines) {
   for (final line in lines.take(6)) {
     final value = line.trim();
@@ -93,6 +102,8 @@ String _extractSupplierName(List<String> lines) {
   return '';
 }
 
+// Scans lines for a regex match and returns the first capture group.
+// Used for invoice number and date extraction.
 String _extractValue(List<String> lines, RegExp pattern) {
   for (final line in lines) {
     final match = pattern.firstMatch(line);
@@ -104,11 +115,20 @@ String _extractValue(List<String> lines, RegExp pattern) {
   return '';
 }
 
+// Tries to parse a single text line as a complete product entry.
+// Four patterns are attempted in order from most to least specific:
+//   1. "Name  3 x R45.00"              — explicit x-quantity (85% confidence)
+//   2. "Name  3  R45.00  R135.00"      — table with unit price + line total (80%)
+//   3. "Name  R45.00"                  — receipt style, qty assumed 1 (65%)
+//   4. "Name  3  R45.00"               — simple qty + price (75%)
+//   5. "CODE Name  3  R45.00"          — SKU-prefixed row (70%)
 ScannedProduct? _parseLine(String line) {
   final normalized = line
       .replaceAll(',', '.')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
+
+  // Pattern 1: explicit "x" quantity marker, e.g. "Bread 2 x R15.00"
   final xMatch = RegExp(
     r'^(.+?)\s+(\d+)\s*x\s*R?\s*(\d+(?:\.\d{1,2})?)$',
     caseSensitive: false,
@@ -123,6 +143,7 @@ ScannedProduct? _parseLine(String line) {
     );
   }
 
+  // Pattern 2: table row with both unit price and line total, e.g. "Bread 3 R15.00 R45.00"
   final tableMatch = RegExp(
     r'^(.+?)\s+(\d+)\s+R?\s*(\d+(?:\.\d{1,2})?)\s+R?\s*(\d+(?:\.\d{1,2})?)$',
     caseSensitive: false,
@@ -130,16 +151,19 @@ ScannedProduct? _parseLine(String line) {
 
   if (tableMatch != null) {
     final quantity = int.parse(tableMatch.group(2)!);
+    final unitPrice = double.parse(tableMatch.group(3)!);
     final lineTotal = double.parse(tableMatch.group(4)!);
 
     return _buildProduct(
       name: tableMatch.group(1)!,
       quantity: quantity,
-      costPrice: lineTotal,
+      costPrice: unitPrice,
+      totalCost: lineTotal,
       confidence: 0.8,
     );
   }
 
+  // Pattern 3: receipt style — name followed directly by a price, qty defaults to 1.
   final receiptPriceMatch = RegExp(
     r'^(.+?)\s+R?\s*(\d+(?:\.\d{1,2})?)$',
     caseSensitive: false,
@@ -154,6 +178,7 @@ ScannedProduct? _parseLine(String line) {
     );
   }
 
+  // Pattern 4: name + qty + optional line total, e.g. "Bread 3 R45.00"
   final simpleMatch = RegExp(
     r'^(.+?)\s+(\d+)\s+R?\s*(\d+(?:\.\d{1,2})?)(?:\s+R?\s*(\d+(?:\.\d{1,2})?))?$',
     caseSensitive: false,
@@ -162,15 +187,17 @@ ScannedProduct? _parseLine(String line) {
   if (simpleMatch != null) {
     final unitPrice = double.parse(simpleMatch.group(3)!);
     final lineTotalStr = simpleMatch.group(4);
-    final costPrice = lineTotalStr != null ? double.parse(lineTotalStr) : unitPrice;
+    final lineTotal = lineTotalStr != null ? double.parse(lineTotalStr) : null;
     return _buildProduct(
       name: simpleMatch.group(1)!,
       quantity: int.parse(simpleMatch.group(2)!),
-      costPrice: costPrice,
+      costPrice: unitPrice,
+      totalCost: lineTotal ?? 0.0,
       confidence: 0.75,
     );
   }
 
+  // Pattern 5: SKU/code prefix then name, e.g. "ABC-001 Bread 3 R45.00"
   final codeMatch = RegExp(
     r'^[A-Za-z0-9\-_/]+\s+(.+?)\s+(\d+)\s+R?\s*(\d+(?:\.\d{1,2})?)',
     caseSensitive: false,
@@ -188,6 +215,8 @@ ScannedProduct? _parseLine(String line) {
   return null;
 }
 
+// Receipt-style fallback: the current line is a product name and the price
+// appears on one of the next 1–3 lines. Looks ahead until it finds a price.
 ScannedProduct? _parseReceiptLine(List<String> lines, int index) {
   final nameLine = lines[index]
       .replaceAll(RegExp(r'\s+'), ' ')
@@ -202,6 +231,8 @@ ScannedProduct? _parseReceiptLine(List<String> lines, int index) {
         .replaceAll(',', '.')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+
+    // Look for a price at the end of the line, optionally with an "R" prefix.
     final priceMatch = RegExp(
       r'(?:^|\s)R?\s*(\d+(?:\.\d{1,2})?)\s*$',
       caseSensitive: false,
@@ -227,6 +258,9 @@ ScannedProduct? _parseReceiptLine(List<String> lines, int index) {
   return null;
 }
 
+// Returns true if the line could plausibly be a product name.
+// Rejects lines that are too short, start with a digit, are pure symbols,
+// look like a standalone price, or contain summary keywords.
 bool _looksLikeProductName(String line) {
   final value = line.trim();
   final lower = value.toLowerCase();

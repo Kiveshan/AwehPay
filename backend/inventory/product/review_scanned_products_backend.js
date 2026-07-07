@@ -2,9 +2,8 @@ const express = require('express');
 const admin = require('firebase-admin');
 
 const {
-  resolveBusinessId,
+  resolveBusinessContext,
   normalizeName,
-  productResponse,
   serverTimestamp,
 } = require('../service/inventory_helpers');
 
@@ -12,68 +11,13 @@ const {
   parseInvoiceFromRawText,
 } = require('../service/invoice_parser_service');
 
+const {
+  matchProductsForBusiness,
+} = require('../service/match_products_service');
+
 const router = express.Router();
 const db = admin.firestore();
 const auth = admin.auth();
-
-async function matchProductsForBusiness({ businessId, products }) {
-  const productsRef = db
-    .collection('businesses')
-    .doc(businessId)
-    .collection('products');
-
-  const matchedProducts = [];
-
-  for (const product of products) {
-    const barcode =
-      typeof product.barcode === 'string' ? product.barcode.trim() : '';
-    const nameLower = normalizeName(product.name);
-    let matchDoc = null;
-
-    if (barcode) {
-      const barcodeSnapshot = await productsRef
-        .where('barcode', '==', barcode)
-        .where('isDeleted', '==', false)
-        .limit(1)
-        .get();
-
-      if (!barcodeSnapshot.empty) {
-        matchDoc = barcodeSnapshot.docs[0];
-      }
-    }
-
-    if (!matchDoc && nameLower) {
-      const nameSnapshot = await productsRef
-        .where('nameLower', '==', nameLower)
-        .where('isDeleted', '==', false)
-        .limit(1)
-        .get();
-
-      if (!nameSnapshot.empty) {
-        matchDoc = nameSnapshot.docs[0];
-      } else {
-        const fallbackSnapshot = await productsRef
-          .where('isDeleted', '==', false)
-          .get();
-
-        matchDoc =
-          fallbackSnapshot.docs.find(
-            (doc) => normalizeName(doc.data()?.name) === nameLower
-          ) || null;
-      }
-    }
-
-    const matchData = matchDoc ? productResponse(matchDoc) : null;
-    matchedProducts.push({
-      ...product,
-      isExistingProduct: Boolean(matchDoc),
-      matchedProductId: matchDoc?.id || null,
-      existingProduct: matchData,
-    });
-  }
-
-  return matchedProducts;
-}
 
 router.post('/match-scanned-products', async (req, res) => {
   try {
@@ -87,7 +31,7 @@ router.post('/match-scanned-products', async (req, res) => {
       return res.status(400).json({ error: 'products must be an array' });
     }
 
-    const businessId = await resolveBusinessId({ auth, db, idToken });
+    const { businessId } = await resolveBusinessContext({ auth, db, idToken });
     const matchedProducts = await matchProductsForBusiness({
       businessId,
       products,
@@ -111,7 +55,7 @@ router.post('/match-scanned-products-from-raw-text', async (req, res) => {
       return res.status(400).json({ error: 'rawOcrText is required' });
     }
 
-    const businessId = await resolveBusinessId({ auth, db, idToken });
+    const { businessId } = await resolveBusinessContext({ auth, db, idToken });
     const parsed = parseInvoiceFromRawText(rawOcrText);
     const matchedProducts = await matchProductsForBusiness({
       businessId,
@@ -169,10 +113,11 @@ router.post('/save-invoice-scan', async (req, res) => {
       }
     }
 
-    const businessId = await resolveBusinessId({ auth, db, idToken });
+    const { businessId, uid } = await resolveBusinessContext({ auth, db, idToken });
     const businessRef = db.collection('businesses').doc(businessId);
     const invoiceRef = businessRef.collection('invoiceScans').doc();
     const productsRef = businessRef.collection('products');
+    const movementsRef = businessRef.collection('stockMovements');
     const now = serverTimestamp();
 
     const batch = db.batch();
@@ -194,6 +139,8 @@ router.post('/save-invoice-scan', async (req, res) => {
         quantity: product.quantity,
         costPrice: product.costPrice,
         sellingPrice: product.sellingPrice,
+        totalCost: typeof product.totalCost === 'number' ? product.totalCost : 0,
+        vat: product.vat === true,
         lowStockThreshold: product.lowStockThreshold,
         barcode: typeof product.barcode === 'string' ? product.barcode.trim() : '',
         category:
@@ -218,19 +165,47 @@ router.post('/save-invoice-scan', async (req, res) => {
         typeof product.unit === 'string' && product.unit.trim()
           ? product.unit.trim()
           : 'item';
+      const resolvedTotalCost = typeof product.totalCost === 'number' ? product.totalCost : 0;
+      const resolvedVat = product.vat === true;
 
       if (product.matchedProductId) {
         const productRef = productsRef.doc(product.matchedProductId);
+        const existingDoc = await productRef.get();
+        const existingCategory =
+          existingDoc.exists && existingDoc.data()?.category
+            ? existingDoc.data().category
+            : category;
+        const previousQuantity = existingDoc.exists ? (existingDoc.data()?.stockQuantity ?? 0) : 0;
         batch.update(productRef, {
           costPrice: product.costPrice,
           sellingPrice: product.sellingPrice,
+          totalCost: resolvedTotalCost,
+          vat: resolvedVat,
           stockQuantity: admin.firestore.FieldValue.increment(product.quantity),
           lowStockThreshold: product.lowStockThreshold,
-          category,
+          category: existingCategory,
           unit,
           updatedAt: now,
           lastScannedAt: now,
           source: 'invoice',
+        });
+        const movementRef = movementsRef.doc();
+        batch.set(movementRef, {
+          movementId: movementRef.id,
+          businessId,
+          createdAt: now,
+          createdBy: uid,
+          productId: product.matchedProductId,
+          productName: product.name.trim(),
+          type: 'replenish',
+          previousQuantity,
+          newQuantity: previousQuantity + product.quantity,
+          quantity: product.quantity,
+          reason: 'Stock replenishment via invoice',
+          referenceId: invoiceRef.id,
+          referenceType: 'invoice',
+          total: resolvedTotalCost,
+          vat: resolvedVat,
         });
       } else {
         const productRef = productsRef.doc();
@@ -243,6 +218,8 @@ router.post('/save-invoice-scan', async (req, res) => {
           category,
           costPrice: product.costPrice,
           sellingPrice: product.sellingPrice,
+          totalCost: resolvedTotalCost,
+          vat: resolvedVat,
           stockQuantity: product.quantity,
           lowStockThreshold: product.lowStockThreshold,
           unit,
@@ -256,6 +233,24 @@ router.post('/save-invoice-scan', async (req, res) => {
           createdAt: now,
           updatedAt: now,
           lastScannedAt: now,
+        });
+        const movementRef = movementsRef.doc();
+        batch.set(movementRef, {
+          movementId: movementRef.id,
+          businessId,
+          createdAt: now,
+          createdBy: uid,
+          productId: productRef.id,
+          productName: product.name.trim(),
+          type: 'initial_stock',
+          previousQuantity: 0,
+          newQuantity: product.quantity,
+          quantity: product.quantity,
+          reason: 'Initial stock via invoice',
+          referenceId: invoiceRef.id,
+          referenceType: 'invoice',
+          total: resolvedTotalCost,
+          vat: resolvedVat,
         });
         createdCount += 1;
       }
