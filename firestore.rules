@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function ownsBusiness(businessId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+    }
+
+    // ── Users ────────────────────────────────────────────────────
+    // Flutter client reads the current user doc to get businessId,
+    // and writes it once during registration.
+
+    match /users/{userId} {
+      allow create: if isOwner(userId);
+      allow read, update: if isOwner(userId);
+    }
+
+    // ── Businesses ───────────────────────────────────────────────
+    // Created during registration; read on the home screen.
+    // Updates are done through the backend API (Admin SDK bypasses rules).
+
+    match /businesses/{businessId} {
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+
+      // ── Bank accounts (sub-collection) ───────────────────────
+      // Created during registration. After that, only the owner may read/update.
+      // The create rule is intentionally lenient because the parent business
+      // doc is committed in the same batch and is not yet visible to get().
+
+      match /bankAccounts/{accountId} {
+        allow create: if isAuthenticated() && request.resource.data.businessId == businessId;
+        allow read, update, delete: if ownsBusiness(businessId);
+      }
+
+      // ── Sales summaries (sub-collection) ─────────────────────
+      // Written exclusively by the backend. The Flutter client reads the latest summary.
+
+      match /salesSummaries/{summaryId} {
+        allow read: if ownsBusiness(businessId);
+      }
+    }
+
+    // ── Subscription tiers ─────────────────────────────────────
+    // Public read: needed during registration (before auth) and for admin screens.
+
+    match /subscriptionTiers/{tierId} {
+      allow read: if true;
+    }
+
+    // ── Admin users ──────────────────────────────────────────────
+    // The app checks whether the signed-in user is an admin by querying
+    // with .where('uid', ...).limit(1) or .where('email', ...).limit(1).
+    // We restrict list queries to a single result to limit data exposure.
+
+    match /adminUsers/{docId} {
+      allow get: if isAuthenticated() &&
+        (resource.data.uid == request.auth.uid || resource.data.email == request.auth.token.email);
+      allow list: if isAuthenticated() && request.query.limit <= 1;
+    }
+
+    // ── Default deny ─────────────────────────────────────────────
+    // All other collections are accessed only through the backend API
+    // (Admin SDK bypasses these rules), so deny direct client access.
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
