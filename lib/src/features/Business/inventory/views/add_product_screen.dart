@@ -100,6 +100,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           setState(() {
             _productNameLockedBySelection = false;
             _selectedProductId = null;
+            _existingStockQuantity = null;
             _selectedCategory = null;
             _categoryController.clear();
             _costPriceController.clear();
@@ -171,6 +172,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                             hasScannedBarcode: _hasScannedBarcode,
                             lockedProductName: widget.lockedProductName,
                             lockedCategory: widget.lockedCategory,
+                            existingStockQuantity: _effectiveExistingStock,
                             productOptions: _productOptions,
                             categoryOptions: _categoryOptions,
                             selectedCategory: _selectedCategory,

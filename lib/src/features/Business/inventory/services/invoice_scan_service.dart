@@ -17,9 +17,8 @@ class InvoiceScanService {
 
   final ImagePicker _picker;
 
-  /// Returns the file path of the chosen invoice, or null if cancelled.
-  /// Camera uses [ImagePicker]; file mode uses [FilePicker] and accepts
-  /// PDF, JPG, and PNG documents.
+  // Opens the device camera or the file picker depending on the user's choice.
+  // Returns the local file path of the selected image/PDF, or null if cancelled.
   Future<String?> pickInvoiceFilePath({
     required InvoiceImageSource source,
     int imageQuality = 85,
@@ -31,6 +30,7 @@ class InvoiceScanService {
       );
       return image?.path;
     } else {
+      // File mode — accepts PDF, JPG, and PNG invoices from storage.
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
@@ -39,16 +39,12 @@ class InvoiceScanService {
     }
   }
 
-  /// Runs OCR on an image or PDF file, automatically selecting the best
-  /// rotation from all four 90° candidates.
-  ///
-  /// PDFs are rendered to a PNG image of the first page before OCR.
-  /// Each candidate is scored by checking that invoice footer keywords
-  /// appear near the bottom and header keywords near the top.
-  /// The first candidate that scores ≥ 3 is returned immediately; otherwise
-  /// the highest-scoring candidate wins.
+  // Entry point for OCR. Converts the file to bytes, tries all four rotations,
+  // scores each result, and returns the best-oriented RecognizedText.
   Future<RecognizedText> recognizeFromFilePath(String filePath) async {
     final Uint8List bytes;
+
+    // PDFs must be rendered to a bitmap first; images are read directly.
     if (filePath.toLowerCase().endsWith('.pdf')) {
       bytes = await _pdfFirstPageToBytes(filePath);
     } else {
@@ -56,6 +52,8 @@ class InvoiceScanService {
     }
 
     final isPdf = filePath.toLowerCase().endsWith('.pdf');
+    // Read the EXIF rotation tag so we start with the most likely orientation.
+    // PDFs don't have EXIF data, so we default to 0°.
     final exifCwDegrees = isPdf ? 0 : _requiredCwRotation(bytes);
 
     // Try all four 90° increments, starting from the EXIF-derived rotation
@@ -72,6 +70,7 @@ class InvoiceScanService {
     int bestRows = 0;
 
     for (final degrees in degreesToTry) {
+      // Write a rotated copy to a temp file, run OCR, then delete it.
       final path = await _rotatedTempPath(bytes, degrees);
       final result = await _ocr(path, originalPath: filePath);
       _deleteTempFile(path, filePath);
@@ -94,16 +93,18 @@ class InvoiceScanService {
     return best!;
   }
 
+  // Convenience wrapper that returns just the plain text string from OCR.
   Future<String> recognizeTextFromFilePath(String filePath) async {
     final result = await recognizeFromFilePath(filePath);
     return result.text;
   }
 
-  // ---------------------------------------------------------------------------
+  
   // Private helpers
-  // ---------------------------------------------------------------------------
 
-  /// Renders the first page of a PDF to PNG bytes at 2× scale for OCR.
+
+  // Renders the first page of a PDF to PNG bytes at 2× scale.
+  // Higher resolution gives ML Kit more pixels to work with, improving accuracy.
   Future<Uint8List> _pdfFirstPageToBytes(String pdfPath) async {
     final document = await PdfDocument.openFile(pdfPath);
     try {
@@ -121,13 +122,14 @@ class InvoiceScanService {
     }
   }
 
-  /// Returns a score for how "right-side up" an OCR result looks.
-  /// Footer keywords near the bottom and header keywords near the top score
-  /// positively; the same keywords in the wrong position score negatively.
+  // Scores how "right-side up" an OCR result is.
+  // Footer words near the bottom add points; header words near the top add points.
+  // The same words in the wrong position subtract points.
   int _orientationScore(RecognizedText result) {
     final entries = <(double, String)>[];
     for (final block in result.blocks) {
       for (final line in block.lines) {
+        // Collect the vertical centre position and lowercased text of every line.
         entries.add((line.boundingBox.center.dy, line.text.toLowerCase()));
       }
     }
@@ -142,6 +144,7 @@ class InvoiceScanService {
       final isTop = rel < 0.35;
       final isBottom = rel > 0.65;
 
+      // These words typically appear in invoice footers.
       if (text.contains('thank you') ||
           text.contains('banking') ||
           text.contains('returns') ||
@@ -149,6 +152,7 @@ class InvoiceScanService {
         if (isBottom) score += 2;
         if (isTop) score -= 3;
       }
+      // These words typically appear in invoice headers.
       if (text.contains('tax invoice') ||
           text.contains('vat no') ||
           text.contains('reg no') ||
@@ -160,6 +164,8 @@ class InvoiceScanService {
     return score;
   }
 
+ 
+  // ML Kit processes the image entirely on-device — no network call is made.
   Future<RecognizedText> _ocr(String path, {required String originalPath}) async {
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
@@ -169,6 +175,8 @@ class InvoiceScanService {
     }
   }
 
+  // Deletes the rotated temp file after OCR is done, but never deletes the
+  // original file that the user selected.
   void _deleteTempFile(String path, String originalPath) {
     if (path != originalPath) {
       try {
@@ -177,7 +185,8 @@ class InvoiceScanService {
     }
   }
 
-  /// Returns the number of distinct horizontal text rows in the OCR result.
+  // Counts distinct horizontal text rows by checking the gap between consecutive
+  // line centres. A gap > 8px means a new row. Used to break ties in orientation scoring.
   int _countTextRows(RecognizedText result) {
     final ys = <double>[];
     for (final block in result.blocks) {

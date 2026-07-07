@@ -21,9 +21,17 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   bool _productNameLockedBySelection = false;
   String? _selectedProductId;
   String? _selectedCategory;
+  int? _existingStockQuantity;
   List<String> _productOptions = [];
   List<String> _categoryOptions = ['Other'];
   final Map<String, Map<String, dynamic>> _productDataByName = {};
+
+  // Returns the current stock to add on top of when updating, or null for new products.
+  int? get _effectiveExistingStock {
+    if (widget.isReplenishStock) return widget.prefillStockQuantity;
+    if (_selectedProductId != null) return _existingStockQuantity;
+    return null;
+  }
 
   void _applyProductPrefill(Map<String, dynamic> product) {
     _fillFromProductMap(product, lockSelection: true);
@@ -35,6 +43,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   }) {
     setState(() {
       _selectedProductId = product['productId'] as String?;
+      _existingStockQuantity = (product['stockQuantity'] as num?)?.toInt();
       _productNameLockedBySelection = lockSelection;
       _hasScannedBarcode = true;
       _productNameController.text = (product['name'] as String?) ?? '';
@@ -52,7 +61,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       _barcodeController.text = (product['barcode'] as String?) ?? '';
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
-      _quantityController.text = '${product['stockQuantity'] ?? ''}';
+      // Clear quantity so the user enters how much they are adding, not the total.
+      _quantityController.clear();
       _alertQuantityController.text = '${product['lowStockThreshold'] ?? ''}';
     });
   }
@@ -92,11 +102,12 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       return;
     }
 
-    // In replenish mode, the entered quantity is ADDED to the existing stock
-    // already stored for this product rather than replacing it.
-    final effectiveStockQuantity = widget.isReplenishStock
-        ? (widget.prefillStockQuantity ?? 0) + stockQuantity
-        : stockQuantity;
+    // When updating an existing product, the entered quantity is ADDED to the
+    // current stock rather than replacing it (covers replenish mode, barcode
+    // lookup, and manual autocomplete selection).
+    final existingStock = _effectiveExistingStock;
+    final effectiveStockQuantity =
+        existingStock != null ? existingStock + stockQuantity : stockQuantity;
 
     setState(() {
       _isSavingProduct = true;
@@ -209,6 +220,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       setState(() {
         _isProductAdded = false;
         _selectedProductId = null;
+        _existingStockQuantity = null;
         _productNameLockedBySelection = false;
         _hasScannedBarcode = false;
         _selectedCategory = null;

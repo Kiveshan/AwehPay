@@ -72,13 +72,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
       if (!mounted) return;
 
-      if (raw is List) {
-        final items = raw
-            .whereType<Map<String, dynamic>>()
-            .map(ProductItem.fromMap)
-            .toList();
-
-        setState(() {
+      setState(() {
+        if (raw is List) {
+          final items = raw
+              .whereType<Map<String, dynamic>>()
+              .map(ProductItem.fromMap)
+              .toList();
           _allProducts = items;
           if (_allProducts.isNotEmpty) {
             final source = widget.lowStockOnly
@@ -88,9 +87,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ..sort();
             if (cats.isNotEmpty) _selectedCategory = cats.first;
           }
-          _isLoading = false;
-        });
-      }
+        }
+        _isLoading = false;
+      });
     } catch (error) {
       if (mounted) setState(() => _isLoading = false);
     }

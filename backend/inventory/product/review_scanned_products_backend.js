@@ -56,10 +56,18 @@ async function matchProductsForBusiness({ businessId, products }) {
           .where('isDeleted', '==', false)
           .get();
 
+        const scannedWords = nameLower.split(/\W+/).filter((w) => w.length >= 4);
+
         matchDoc =
-          fallbackSnapshot.docs.find(
-            (doc) => normalizeName(doc.data()?.name) === nameLower
-          ) || null;
+          fallbackSnapshot.docs.find((doc) => {
+            const dbName = normalizeName(doc.data()?.name);
+            if (!dbName) return false;
+            if (dbName === nameLower) return true;
+            if (dbName.includes(nameLower) || nameLower.includes(dbName)) return true;
+            const dbWords = dbName.split(/\W+/).filter((w) => w.length >= 4);
+            const overlapCount = scannedWords.filter((w) => dbWords.includes(w)).length;
+            return overlapCount >= 2;
+          }) || null;
       }
     }
 
@@ -221,12 +229,17 @@ router.post('/save-invoice-scan', async (req, res) => {
 
       if (product.matchedProductId) {
         const productRef = productsRef.doc(product.matchedProductId);
+        const existingDoc = await productRef.get();
+        const existingCategory =
+          existingDoc.exists && existingDoc.data()?.category
+            ? existingDoc.data().category
+            : category;
         batch.update(productRef, {
           costPrice: product.costPrice,
           sellingPrice: product.sellingPrice,
           stockQuantity: admin.firestore.FieldValue.increment(product.quantity),
           lowStockThreshold: product.lowStockThreshold,
-          category,
+          category: existingCategory,
           unit,
           updatedAt: now,
           lastScannedAt: now,

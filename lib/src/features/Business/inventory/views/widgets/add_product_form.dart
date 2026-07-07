@@ -13,6 +13,7 @@ class AddProductForm extends StatelessWidget {
     required this.hasScannedBarcode,
     required this.lockedProductName,
     required this.lockedCategory,
+    this.existingStockQuantity,
     required this.productOptions,
     required this.categoryOptions,
     required this.selectedCategory,
@@ -37,6 +38,7 @@ class AddProductForm extends StatelessWidget {
   final bool hasScannedBarcode;
   final String? lockedProductName;
   final String? lockedCategory;
+  final int? existingStockQuantity;
 
   final List<String> productOptions;
   final List<String> categoryOptions;
@@ -116,19 +118,43 @@ class AddProductForm extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: InventoryInputField(
-                  label: 'Quantity',
-                  labelColor: null,
-                  borderColor: null,
-                  textColor: null,
-                  controller: quantityController,
-                  keyboardType: TextInputType.number,
-                  spinnerColor: const Color(0xFFDFA890),
-                  readOnly: isProductAdded,
-                  onIncrement: isProductAdded ? null : onIncrementQuantity,
-                  onDecrement: isProductAdded ? null : onDecrementQuantity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InventoryInputField(
+                      label: existingStockQuantity != null ? 'Quantity to Add' : 'Quantity',
+                      labelColor: null,
+                      borderColor: null,
+                      textColor: null,
+                      controller: quantityController,
+                      keyboardType: TextInputType.number,
+                      spinnerColor: const Color(0xFFDFA890),
+                      readOnly: isProductAdded,
+                      onIncrement: isProductAdded ? null : onIncrementQuantity,
+                      onDecrement: isProductAdded ? null : onDecrementQuantity,
+                    ),
+                    if (existingStockQuantity != null) ...[
+                      const SizedBox(height: 4),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: quantityController,
+                        builder: (context, value, _) {
+                          final entered = int.tryParse(value.text.trim()) ?? 0;
+                          final newTotal = existingStockQuantity! + entered;
+                          return Text(
+                            'Current: $existingStockQuantity  ·  New total: $newTotal',
+                            style: const TextStyle(
+                              color: Color(0xFFDFA890),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: 28),

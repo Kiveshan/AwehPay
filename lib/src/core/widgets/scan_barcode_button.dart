@@ -26,7 +26,7 @@ class ScanBarcodeButton extends StatelessWidget {
             ),
             SizedBox(width: 8),
             Text(
-              'Scan Barcode',
+              'Scan',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 13,

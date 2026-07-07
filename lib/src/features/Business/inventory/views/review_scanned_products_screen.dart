@@ -52,7 +52,7 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
             name: '',
             quantity: 1,
             costPrice: 0,
-            category: 'Other',
+            category: '',
             confidence: 1,
           ),
         ),
@@ -107,6 +107,13 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
     }
 
     for (final product in _products) {
+      if (product.original.isExistingProduct &&
+          product.userConfirmedExisting == null) {
+        return [
+          'Please confirm whether "${product.original.name}" is an existing or new product.',
+        ];
+      }
+
       final name = product.nameController.text.trim();
       final quantity = int.tryParse(product.quantityController.text.trim());
       final costPrice = _parseMoney(product.costPriceController.text);
@@ -116,6 +123,8 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
       );
 
       if (name.isEmpty) return ['Product name is required.'];
+      final category = product.categoryController.text.trim();
+      if (category.isEmpty) return ['Category is required for "$name".'];
       if (quantity == null || quantity <= 0) return ['Quantity must be greater than 0.'];
       if (costPrice == null || costPrice <= 0) return ['Cost price must be greater than 0.'];
       if (sellingPrice == null || sellingPrice <= 0) return ['Selling price is required.'];
@@ -228,6 +237,19 @@ class _ReviewScannedProductsScreenState extends State<ReviewScannedProductsScree
                             onRemove: () {
                               setState(() {
                                 _products.removeAt(index).dispose();
+                              });
+                            },
+                            onDecisionMade: (confirmed) {
+                              setState(() {
+                                _products[index].userConfirmedExisting = confirmed;
+                                if (confirmed) {
+                                  final cat = _products[index]
+                                      .original
+                                      .existingProduct?['category'] as String?;
+                                  if (cat != null && cat.isNotEmpty) {
+                                    _products[index].categoryController.text = cat;
+                                  }
+                                }
                               });
                             },
                           );
