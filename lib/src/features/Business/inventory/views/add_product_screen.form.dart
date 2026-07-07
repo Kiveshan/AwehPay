@@ -49,7 +49,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       _selectedProductId = product['productId'] as String?;
       _existingStockQuantity = (product['stockQuantity'] as num?)?.toInt();
       _productNameLockedBySelection = lockSelection;
-      _hasScannedBarcode = true;
+      final barcode = (product['barcode'] as String?) ?? '';
+      _hasScannedBarcode = barcode.isNotEmpty;
       _productNameController.text = (product['name'] as String?) ?? '';
       final productCategory = (product['category'] as String?) ?? '';
       if (productCategory.isNotEmpty && _categoryOptions.contains(productCategory)) {
@@ -62,7 +63,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         _selectedCategory = null;
         _categoryController.clear();
       }
-      _barcodeController.text = (product['barcode'] as String?) ?? '';
+      _barcodeController.text = barcode;
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
       final rawTotalCost = (product['totalCost'] as num?)?.toDouble() ?? 0.0;
