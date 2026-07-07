@@ -5,6 +5,8 @@ class ProductItem {
     required this.barcode,
     required this.costPrice,
     required this.sellingPrice,
+    required this.totalCost,
+    required this.vat,
     required this.stockQuantity,
     required this.lowStockThreshold,
     required this.category,
@@ -15,6 +17,8 @@ class ProductItem {
   final String barcode;
   final double costPrice;
   final double sellingPrice;
+  final double totalCost;
+  final bool vat;
   final int stockQuantity;
   final int lowStockThreshold;
   final String category;
@@ -28,6 +32,8 @@ class ProductItem {
       barcode: (map['barcode'] as String?) ?? '',
       costPrice: ((map['costPrice'] as num?) ?? 0).toDouble(),
       sellingPrice: ((map['sellingPrice'] as num?) ?? 0).toDouble(),
+      totalCost: ((map['totalCost'] as num?) ?? 0).toDouble(),
+      vat: (map['vat'] as bool?) ?? false,
       stockQuantity: ((map['stockQuantity'] as num?) ?? 0).toInt(),
       lowStockThreshold: ((map['lowStockThreshold'] as num?) ?? 0).toInt(),
       category: (map['category'] as String?) ?? '',
@@ -41,11 +47,14 @@ class ProductItem {
       'barcode': barcode,
       'costPrice': 'R ${costPrice.toStringAsFixed(2)}',
       'sellingPrice': 'R${sellingPrice.toStringAsFixed(2)}',
+      'totalCost': 'R ${totalCost.toStringAsFixed(2)}',
       'quantity': '$stockQuantity',
       'category': category,
       'isLowStock': isLowStock,
+      'vat': vat,
       'rawCostPrice': costPrice,
       'rawSellingPrice': sellingPrice,
+      'rawTotalCost': totalCost,
       'rawStockQuantity': stockQuantity,
       'rawLowStockThreshold': lowStockThreshold,
     };

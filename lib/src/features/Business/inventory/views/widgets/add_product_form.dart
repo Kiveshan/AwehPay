@@ -23,6 +23,9 @@ class AddProductForm extends StatelessWidget {
     required this.barcodeController,
     required this.costPriceController,
     required this.sellingPriceController,
+    required this.totalCostController,
+    required this.vatEnabled,
+    required this.onVatChanged,
     required this.quantityController,
     required this.alertQuantityController,
     required this.onProductOptionSelected,
@@ -50,6 +53,9 @@ class AddProductForm extends StatelessWidget {
   final TextEditingController barcodeController;
   final TextEditingController costPriceController;
   final TextEditingController sellingPriceController;
+  final TextEditingController totalCostController;
+  final bool vatEnabled;
+  final ValueChanged<bool?> onVatChanged;
   final TextEditingController quantityController;
   final TextEditingController alertQuantityController;
 
@@ -112,6 +118,56 @@ class AddProductForm extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   prefixText: 'R',
                   readOnly: isProductAdded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: InventoryInputField(
+                  label: 'Total Cost',
+                  controller: totalCostController,
+                  keyboardType: TextInputType.number,
+                  prefixText: 'R',
+                  readOnly: isProductAdded,
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'VAT',
+                      style: TextStyle(
+                        color: Color(0xFF272A2F),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: vatEnabled,
+                          onChanged: isProductAdded ? null : onVatChanged,
+                          activeColor: const Color(0xFFDFA890),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          vatEnabled ? 'VAT Included' : 'No VAT',
+                          style: const TextStyle(
+                            color: Color(0xFF272A2F),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],

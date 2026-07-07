@@ -41,7 +41,7 @@ class ProductDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                     ],
                     _DetailField(label: 'Product Name', value: details.name),
-                    if (details.barcode.isNotEmpty) ...[  
+                    if (details.barcode.isNotEmpty) ...[
                       const SizedBox(height: 18),
                       _DetailField(label: 'Product Barcode', value: details.barcode),
                     ],
@@ -51,6 +51,16 @@ class ProductDetailsScreen extends StatelessWidget {
                         Expanded(child: _DetailField(label: 'Cost Price', value: details.costPrice)),
                         const SizedBox(width: 28),
                         Expanded(child: _DetailField(label: 'Selling Price', value: details.sellingPrice)),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(child: _DetailField(label: 'Total Cost', value: details.totalCost)),
+                        const SizedBox(width: 28),
+                        Expanded(
+                          child: _VatField(vatEnabled: details.vat),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -74,6 +84,8 @@ class ProductDetailsScreen extends StatelessWidget {
                               'barcode': details.barcode,
                               'costPrice': details.rawCostPrice,
                               'sellingPrice': details.rawSellingPrice,
+                              'totalCost': details.rawTotalCost,
+                              'vat': details.vat,
                               'stockQuantity': details.rawStockQuantity,
                               'lowStockThreshold': details.rawLowStockThreshold,
                             },
@@ -120,11 +132,14 @@ class _ProductDetailsData {
     required this.barcode,
     required this.costPrice,
     required this.sellingPrice,
+    required this.totalCost,
+    required this.vat,
     required this.quantity,
     required this.category,
     required this.isLowStock,
     this.rawCostPrice,
     this.rawSellingPrice,
+    this.rawTotalCost,
     this.rawStockQuantity,
     this.rawLowStockThreshold,
   });
@@ -134,11 +149,14 @@ class _ProductDetailsData {
   final String barcode;
   final String costPrice;
   final String sellingPrice;
+  final String totalCost;
+  final bool vat;
   final String quantity;
   final String category;
   final bool isLowStock;
   final double? rawCostPrice;
   final double? rawSellingPrice;
+  final double? rawTotalCost;
   final int? rawStockQuantity;
   final int? rawLowStockThreshold;
 
@@ -149,11 +167,14 @@ class _ProductDetailsData {
       barcode: product?['barcode'] as String? ?? '',
       costPrice: product?['costPrice'] as String? ?? 'R 20.00',
       sellingPrice: product?['sellingPrice'] as String? ?? 'R 35.00',
+      totalCost: product?['totalCost'] as String? ?? 'R 0.00',
+      vat: product?['vat'] as bool? ?? false,
       quantity: product?['quantity'] as String? ?? '5',
       category: product?['category'] as String? ?? 'Household',
       isLowStock: product?['isLowStock'] as bool? ?? true,
       rawCostPrice: (product?['rawCostPrice'] as num?)?.toDouble(),
       rawSellingPrice: (product?['rawSellingPrice'] as num?)?.toDouble(),
+      rawTotalCost: (product?['rawTotalCost'] as num?)?.toDouble(),
       rawStockQuantity: (product?['rawStockQuantity'] as num?)?.toInt(),
       rawLowStockThreshold:
           (product?['rawLowStockThreshold'] as num?)?.toInt(),
@@ -222,6 +243,51 @@ class _LowStockBadge extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
       ),
+    );
+  }
+}
+
+class _VatField extends StatelessWidget {
+  const _VatField({required this.vatEnabled});
+
+  final bool vatEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'VAT',
+          style: TextStyle(
+            color: Color(0xFF6C7078),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            IgnorePointer(
+              child: Checkbox(
+                value: vatEnabled,
+                onChanged: (_) {},
+                activeColor: const Color(0xFFDFA890),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              vatEnabled ? 'VAT Included' : 'No VAT',
+              style: const TextStyle(
+                color: Color(0xFF272A2F),
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

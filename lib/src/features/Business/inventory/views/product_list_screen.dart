@@ -193,10 +193,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                           'R ${product.costPrice.toStringAsFixed(2)}',
                                       'sellingPrice':
                                           'R${product.sellingPrice.toStringAsFixed(2)}',
+                                      'totalCost':
+                                          'R ${product.totalCost.toStringAsFixed(2)}',
                                       'quantity': '${product.stockQuantity}',
                                       'isLowStock': product.isLowStock,
+                                      'vat': product.vat,
                                       'rawCostPrice': product.costPrice,
                                       'rawSellingPrice': product.sellingPrice,
+                                      'rawTotalCost': product.totalCost,
                                       'rawStockQuantity': product.stockQuantity,
                                       'rawLowStockThreshold':
                                           product.lowStockThreshold,

@@ -208,6 +208,7 @@ ScannedProduct? _buildProduct({
   required String name,
   required int quantity,
   required double costPrice,
+  double totalCost = 0.0,
   required double confidence,
 }) {
   // Remove all characters that aren't letters, digits, spaces, or common punctuation.
@@ -267,6 +268,7 @@ ScannedProduct? _buildProduct({
     name: cleanedName,
     quantity: quantity,
     costPrice: costPrice,
+    totalCost: totalCost,
     category: 'Other',
     confidence: confidence,
   );

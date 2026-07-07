@@ -151,13 +151,14 @@ ScannedProduct? _parseLine(String line) {
 
   if (tableMatch != null) {
     final quantity = int.parse(tableMatch.group(2)!);
-    // Use the line total (last price) as the cost price stored per unit isn't what we track.
+    final unitPrice = double.parse(tableMatch.group(3)!);
     final lineTotal = double.parse(tableMatch.group(4)!);
 
     return _buildProduct(
       name: tableMatch.group(1)!,
       quantity: quantity,
-      costPrice: lineTotal,
+      costPrice: unitPrice,
+      totalCost: lineTotal,
       confidence: 0.8,
     );
   }
@@ -186,11 +187,12 @@ ScannedProduct? _parseLine(String line) {
   if (simpleMatch != null) {
     final unitPrice = double.parse(simpleMatch.group(3)!);
     final lineTotalStr = simpleMatch.group(4);
-    final costPrice = lineTotalStr != null ? double.parse(lineTotalStr) : unitPrice;
+    final lineTotal = lineTotalStr != null ? double.parse(lineTotalStr) : null;
     return _buildProduct(
       name: simpleMatch.group(1)!,
       quantity: int.parse(simpleMatch.group(2)!),
-      costPrice: costPrice,
+      costPrice: unitPrice,
+      totalCost: lineTotal ?? 0.0,
       confidence: 0.75,
     );
   }

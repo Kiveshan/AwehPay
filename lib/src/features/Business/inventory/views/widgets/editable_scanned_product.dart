@@ -15,7 +15,19 @@ class EditableScannedProduct {
         ),
         lowStockThresholdController = TextEditingController(
           text: product.lowStockThreshold == null ? '' : '${product.lowStockThreshold}',
-        );
+        ),
+        vatEnabled = ValueNotifier<bool>(product.vat) {
+    // Initialize totalCost from OCR line total if available, otherwise qty × costPrice.
+    final initialTotal = product.totalCost > 0
+        ? product.totalCost
+        : product.costPrice * product.quantity;
+    totalCostController = TextEditingController(
+      text: initialTotal > 0 ? initialTotal.toStringAsFixed(2) : '',
+    );
+    costPriceController.addListener(_updateTotalCost);
+    quantityController.addListener(_updateTotalCost);
+    vatEnabled.addListener(_updateTotalCost);
+  }
 
   final ScannedProduct original;
 
@@ -30,9 +42,25 @@ class EditableScannedProduct {
   final TextEditingController categoryController;
   final TextEditingController sellingPriceController;
   final TextEditingController lowStockThresholdController;
+  late final TextEditingController totalCostController;
+  final ValueNotifier<bool> vatEnabled;
 
   int get existingStock =>
       (original.existingProduct?['stockQuantity'] as num?)?.toInt() ?? 0;
+
+  void _updateTotalCost() {
+    final cp = double.tryParse(
+          costPriceController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
+        ) ??
+        0.0;
+    final qty = int.tryParse(quantityController.text.trim()) ?? 0;
+    var total = cp * qty;
+    if (vatEnabled.value) total *= 1.15;
+    final newText = total > 0 ? total.toStringAsFixed(2) : '';
+    if (totalCostController.text != newText) {
+      totalCostController.text = newText;
+    }
+  }
 
   ScannedProduct toScannedProduct() {
     final enteredQty = int.tryParse(quantityController.text.trim()) ?? 0;
@@ -40,6 +68,10 @@ class EditableScannedProduct {
           costPriceController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
         ) ??
         0;
+    final totalCost = double.tryParse(
+          totalCostController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
+        ) ??
+        0.0;
     final sellingPrice = double.tryParse(
       sellingPriceController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
     );
@@ -52,6 +84,8 @@ class EditableScannedProduct {
         name: nameController.text.trim(),
         quantity: enteredQty,
         costPrice: costPrice,
+        totalCost: totalCost,
+        vat: vatEnabled.value,
         category: category,
         barcode: original.barcode,
         sellingPrice: sellingPrice,
@@ -72,6 +106,8 @@ class EditableScannedProduct {
       name: nameController.text.trim(),
       quantity: effectiveQty,
       costPrice: costPrice,
+      totalCost: totalCost,
+      vat: vatEnabled.value,
       category: category,
       sellingPrice: sellingPrice,
       lowStockThreshold: lowStock,
@@ -85,5 +121,7 @@ class EditableScannedProduct {
     categoryController.dispose();
     sellingPriceController.dispose();
     lowStockThresholdController.dispose();
+    totalCostController.dispose();
+    vatEnabled.dispose();
   }
 }

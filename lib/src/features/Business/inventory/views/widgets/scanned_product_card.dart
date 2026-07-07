@@ -234,6 +234,23 @@ class ScannedProductCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _TextInput(
+                  label: 'Total Cost',
+                  controller: product.totalCostController,
+                  keyboardType: TextInputType.number,
+                  prefixText: 'R',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _VatCheckbox(vatNotifier: product.vatEnabled),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -270,6 +287,53 @@ class _DecisionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _VatCheckbox extends StatelessWidget {
+  const _VatCheckbox({required this.vatNotifier});
+
+  final ValueNotifier<bool> vatNotifier;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: vatNotifier,
+      builder: (context, vatEnabled, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'VAT',
+              style: TextStyle(
+                color: Color(0xFF272A2F),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Checkbox(
+                  value: vatEnabled,
+                  onChanged: (v) => vatNotifier.value = v ?? false,
+                  activeColor: const Color(0xFFDFA890),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                Text(
+                  vatEnabled ? 'VAT Included' : 'No VAT',
+                  style: const TextStyle(
+                    color: Color(0xFF272A2F),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

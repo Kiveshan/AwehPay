@@ -5,6 +5,8 @@ class ScannedProduct {
     required this.costPrice,
     required this.category,
     required this.confidence,
+    this.totalCost = 0.0,
+    this.vat = false,
     this.barcode,
     this.sellingPrice,
     this.lowStockThreshold,
@@ -17,6 +19,8 @@ class ScannedProduct {
   final String name;
   final int quantity;
   final double costPrice;
+  final double totalCost;
+  final bool vat;
   final String category;
   final String? barcode;
   final double? sellingPrice;
@@ -31,6 +35,8 @@ class ScannedProduct {
     String? name,
     int? quantity,
     double? costPrice,
+    double? totalCost,
+    bool? vat,
     String? category,
     String? barcode,
     double? sellingPrice,
@@ -45,6 +51,8 @@ class ScannedProduct {
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       costPrice: costPrice ?? this.costPrice,
+      totalCost: totalCost ?? this.totalCost,
+      vat: vat ?? this.vat,
       category: category ?? this.category,
       barcode: barcode ?? this.barcode,
       sellingPrice: sellingPrice ?? this.sellingPrice,
@@ -62,6 +70,8 @@ class ScannedProduct {
       'name': name,
       'quantity': quantity,
       'costPrice': costPrice,
+      'totalCost': totalCost,
+      'vat': vat,
       'category': category,
       'barcode': barcode ?? '',
       'sellingPrice': sellingPrice,
@@ -82,6 +92,8 @@ class ScannedProduct {
       name: (json['name'] as String?) ?? '',
       quantity: (json['quantity'] as num?)?.toInt() ?? 0,
       costPrice: (json['costPrice'] as num?)?.toDouble() ?? 0,
+      totalCost: (json['totalCost'] as num?)?.toDouble() ?? 0.0,
+      vat: json['vat'] == true,
       category: (json['category'] as String?) ?? 'Other',
       barcode: json['barcode'] as String?,
       sellingPrice: (json['sellingPrice'] as num?)?.toDouble() ??

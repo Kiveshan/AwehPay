@@ -1,7 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 
-const { resolveBusinessId } = require('../service/inventory_helpers');
+const { resolveBusinessContext } = require('../service/inventory_helpers');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -15,7 +15,7 @@ router.post('/list', async (req, res) => {
       return res.status(400).json({ error: 'idToken is required' });
     }
 
-    const businessId = await resolveBusinessId({ auth, db, idToken });
+    const { businessId } = await resolveBusinessContext({ auth, db, idToken });
 
     const snapshot = await db
       .collection('businesses')
@@ -44,6 +44,8 @@ router.post('/update-product', async (req, res) => {
       barcode,
       costPrice,
       sellingPrice,
+      totalCost,
+      vat,
       stockQuantity,
       lowStockThreshold,
       category,
@@ -68,12 +70,9 @@ router.post('/update-product', async (req, res) => {
       });
     }
 
-    const businessId = await resolveBusinessId({ auth, db, idToken });
-    const productRef = db
-      .collection('businesses')
-      .doc(businessId)
-      .collection('products')
-      .doc(productId);
+    const { businessId, uid } = await resolveBusinessContext({ auth, db, idToken });
+    const businessRef = db.collection('businesses').doc(businessId);
+    const productRef = businessRef.collection('products').doc(productId);
 
     const productDoc = await productRef.get();
 
@@ -81,10 +80,17 @@ router.post('/update-product', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    const previousQuantity = productDoc.data()?.stockQuantity ?? 0;
+    const productName = productDoc.data()?.name ?? '';
+    const resolvedTotalCost = typeof totalCost === 'number' ? totalCost : 0;
+    const resolvedVat = vat === true;
     const now = admin.firestore.FieldValue.serverTimestamp();
+
     const updateData = {
       costPrice,
       sellingPrice,
+      totalCost: resolvedTotalCost,
+      vat: resolvedVat,
       stockQuantity,
       lowStockThreshold,
       updatedAt: now,
@@ -98,7 +104,32 @@ router.post('/update-product', async (req, res) => {
       updateData.category = category.trim();
     }
 
-    await productRef.update(updateData);
+    const quantityDelta = stockQuantity - previousQuantity;
+    const movementType = quantityDelta > 0 ? 'replenish' : quantityDelta < 0 ? 'adjustment' : 'update';
+
+    const movementRef = businessRef.collection('stockMovements').doc();
+    const movementData = {
+      movementId: movementRef.id,
+      businessId,
+      createdAt: now,
+      createdBy: uid,
+      productId,
+      productName,
+      type: movementType,
+      previousQuantity,
+      newQuantity: stockQuantity,
+      quantity: quantityDelta,
+      reason: quantityDelta > 0 ? 'Stock replenishment' : 'Product update',
+      referenceId: null,
+      referenceType: 'manual',
+      total: resolvedTotalCost,
+      vat: resolvedVat,
+    };
+
+    const batch = db.batch();
+    batch.update(productRef, updateData);
+    batch.set(movementRef, movementData);
+    await batch.commit();
 
     res.json({ success: true, productId, message: 'Product updated successfully' });
   } catch (error) {

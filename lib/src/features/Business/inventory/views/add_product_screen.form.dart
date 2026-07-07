@@ -14,6 +14,9 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   late final TextEditingController _barcodeController;
   late final TextEditingController _costPriceController;
   late final TextEditingController _sellingPriceController;
+  late final TextEditingController _totalCostController;
+  bool _vatEnabled = false;
+  bool _skipTotalCostAutoCalc = false;
   late final TextEditingController _quantityController;
   late final TextEditingController _alertQuantityController;
   bool _hasScannedBarcode = false;
@@ -41,6 +44,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
     Map<String, dynamic> product, {
     required bool lockSelection,
   }) {
+    _skipTotalCostAutoCalc = true;
     setState(() {
       _selectedProductId = product['productId'] as String?;
       _existingStockQuantity = (product['stockQuantity'] as num?)?.toInt();
@@ -61,10 +65,26 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       _barcodeController.text = (product['barcode'] as String?) ?? '';
       _costPriceController.text = '${product['costPrice'] ?? ''}';
       _sellingPriceController.text = '${product['sellingPrice'] ?? ''}';
+      final rawTotalCost = (product['totalCost'] as num?)?.toDouble() ?? 0.0;
+      _totalCostController.text = rawTotalCost > 0 ? rawTotalCost.toStringAsFixed(2) : '';
+      _vatEnabled = (product['vat'] as bool?) ?? false;
       // Clear quantity so the user enters how much they are adding, not the total.
       _quantityController.clear();
       _alertQuantityController.text = '${product['lowStockThreshold'] ?? ''}';
     });
+    _skipTotalCostAutoCalc = false;
+  }
+
+  void _recalculateTotalCost() {
+    if (_skipTotalCostAutoCalc) return;
+    final costPrice = _parseMoney(_costPriceController.text) ?? 0.0;
+    final qty = int.tryParse(_quantityController.text.trim()) ?? 0;
+    var total = costPrice * qty;
+    if (_vatEnabled) total *= 1.15;
+    final newText = total > 0 ? total.toStringAsFixed(2) : '';
+    if (_totalCostController.text != newText) {
+      _totalCostController.text = newText;
+    }
   }
 
   void _changeIntField(TextEditingController controller, int delta) {
@@ -86,6 +106,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         : (_selectedCategory ?? '');
     final costPrice = _parseMoney(_costPriceController.text);
     final sellingPrice = _parseMoney(_sellingPriceController.text);
+    final totalCost = _parseMoney(_totalCostController.text) ?? 0.0;
     final stockQuantity = int.tryParse(_quantityController.text.trim());
     final lowStockThreshold =
         int.tryParse(_alertQuantityController.text.trim());
@@ -120,6 +141,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
+          totalCost: totalCost,
+          vat: _vatEnabled,
           stockQuantity: effectiveStockQuantity,
           lowStockThreshold: lowStockThreshold,
           category: category,
@@ -130,6 +153,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
           barcode: _hasScannedBarcode ? _barcodeController.text.trim() : '',
           costPrice: costPrice,
           sellingPrice: sellingPrice,
+          totalCost: totalCost,
+          vat: _vatEnabled,
           stockQuantity: effectiveStockQuantity,
           category: category,
           lowStockThreshold: lowStockThreshold,
@@ -229,6 +254,8 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
         _barcodeController.clear();
         _costPriceController.clear();
         _sellingPriceController.clear();
+        _totalCostController.clear();
+        _vatEnabled = false;
         _quantityController.clear();
         _alertQuantityController.clear();
       });

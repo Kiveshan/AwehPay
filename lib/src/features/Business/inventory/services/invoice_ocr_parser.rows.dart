@@ -90,10 +90,10 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
 
     if (allPrices.isEmpty) continue;
 
-    // Always use the LAST money value as the cost price (line total on
-    // structured invoices).
+    // Always use the LAST money value as the price (line total on structured invoices).
     final namePortion = _removeMoneyValues(rowText);
     var price = allPrices.last;
+    double? lineTotal;
 
     // When two prices are present (unit price + line total), derive qty from
     // their ratio. OCR frequently misses or garbles the narrow QTY column,
@@ -102,22 +102,22 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
     int? calculatedQty;
     if (allPrices.length >= 2) {
       final unitPrice = allPrices[allPrices.length - 2];
-      final lineTotal = allPrices.last;
+      final rawLineTotal = allPrices.last;
       if (unitPrice > 0) {
-        if (lineTotal < unitPrice * 0.9) {
-          // Line total is lower than the unit price — impossible for qty≥1,
-          // so the line total column was OCR-corrupted (e.g. "R4,999.99"
-          // partially read as "R4.99"). Fall back to unit price, qty=1.
+        if (rawLineTotal < unitPrice * 0.9) {
+          // Line total lower than unit price — OCR-corrupted. Fall back to unit price, qty=1.
           price = unitPrice;
           calculatedQty = 1;
         } else {
           // qty = lineTotal / unitPrice, rounded to the nearest integer.
-          final ratio = lineTotal / unitPrice;
+          final ratio = rawLineTotal / unitPrice;
           final rounded = ratio.round();
           if (rounded >= 1 &&
               rounded <= 999 &&
               (ratio - rounded).abs() / rounded < 0.02) {
             calculatedQty = rounded;
+            price = unitPrice;       // use unit price as costPrice
+            lineTotal = rawLineTotal; // remember the line total
           }
         }
       }
@@ -168,6 +168,7 @@ List<ScannedProduct> _parseVisualRows(RecognizedText recognizedText) {
       name: name,
       quantity: quantity ?? 1,
       costPrice: price,
+      totalCost: lineTotal ?? 0.0,
       confidence: 0.9,
     );
     if (product != null) products.add(product);
