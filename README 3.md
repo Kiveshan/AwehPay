@@ -492,6 +492,8 @@ Inventory items sold by the business.
 | `imageUrl`         | string    | Product image URL                     |
 | `sellingPrice`     | number    | Selling price                         |
 | `costPrice`        | number    | Cost price                            |
+| `total`            | number    | Total price including VAT            |
+| `vat`              | boolean   | Whether VAT is applied                |
 | `stockQuantity`    | number    | Current stock quantity                |
 | `lowStockThreshold`| number    | Low stock alert threshold             |
 | `unit`             | string    | Unit of measure (e.g., `item`)        |
@@ -514,6 +516,8 @@ Inventory items sold by the business.
 | `imageUrl`         | string    | *(empty)*             |
 | `sellingPrice`     | number    | `18`                  |
 | `costPrice`        | number    | `14`                  |
+| `total`            | number    | `20.52`               |
+| `vat`              | boolean   | `true`                |
 | `stockQuantity`    | number    | `25`                  |
 | `lowStockThreshold`| number    | `5`                   |
 | `unit`             | string    | `item`                |
@@ -686,7 +690,9 @@ Tracks inventory changes (restocking, sales, adjustments).
 | `productId`        | string    | Reference to product                  |
 | `productName`      | string    | Product name                          |
 | `type`             | string    | `stock_in`, `stock_out`, `sale`, `return`, `adjustment`, `damaged` |
-| `quantity`         | number    | Amount changed                        |
+| `quantity`         | number    | Stock quantity changed                |
+| `total`            | number    | Total value including VAT            |
+| `vat`              | boolean   | Whether VAT is applied                |
 | `previousQuantity` | number    | Quantity before movement              |
 | `newQuantity`      | number    | Quantity after movement               |
 | `reason`           | string    | Reason for movement                   |
@@ -705,6 +711,8 @@ Tracks inventory changes (restocking, sales, adjustments).
 | `productName`      | string    | `Bread`                      |
 | `type`             | string    | `initial_stock`              |
 | `quantity`         | number    | `25`                         |
+| `total`            | number    | `513`                        |
+| `vat`              | boolean   | `true`                       |
 | `previousQuantity` | number    | `0`                          |
 | `newQuantity`      | number    | `25`                         |
 | `reason`           | string    | `Initial demo stock`         |
