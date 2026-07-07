@@ -56,33 +56,23 @@ router.get('/analytics', async (req, res) => {
     const weekStart = ts(weekStartDate);
 
     // Queries in parallel
-    const [dayTx, dayExp, weekTx, weekExp, monthTx, monthExp, productsSnap] = await Promise.all([
+    const [dayTx, dayExp, weekTx, weekExp, monthTx, monthExp, dayStock] = await Promise.all([
       biz.collection('transactions').where('saleDate', '>=', dayStart).where('saleDate', '<=', dayEnd).get(),
       biz.collection('expenses').where('expenseDate', '>=', dayStart).where('expenseDate', '<=', dayEnd).get(),
       biz.collection('transactions').where('saleDate', '>=', weekStart).where('saleDate', '<=', dayEnd).get(),
       biz.collection('expenses').where('expenseDate', '>=', weekStart).where('expenseDate', '<=', dayEnd).get(),
       biz.collection('transactions').where('saleDate', '>=', monthStart).where('saleDate', '<=', dayEnd).get(),
       biz.collection('expenses').where('expenseDate', '>=', monthStart).where('expenseDate', '<=', dayEnd).get(),
-      biz.collection('products').get(),
+      biz.collection('stockMovements').where('createdAt', '>=', dayStart).where('createdAt', '<=', dayEnd).get(),
     ]);
 
-    // Cost price per product id — used to work out how much was spent buying stock
-    const costMap = {};
-    for (const doc of productsSnap.docs) {
-      costMap[doc.id] = doc.data().costPrice || 0;
-    }
-
-    // Cost of goods sold: for each product line-item, costPrice × quantity
-    const costOfGoodsSold = (txDocs) =>
-      txDocs.reduce((sum, doc) => {
-        const items = Array.isArray(doc.data().items) ? doc.data().items : [];
-        return sum + items.reduce((s, item) => {
-          if (!item || typeof item !== 'object' || Array.isArray(item)) return s;
-          if (item.itemType && item.itemType !== 'product') return s;
-          const cost = costMap[item.itemId] || 0;
-          const qty  = parseInt(item.quantity) || 0;
-          return s + cost * qty;
-        }, 0);
+    // Money spent buying stock (selected day), from stockMovements.
+    // `total` is the amount paid; if `vat` is false, VAT (15%) isn't included yet, so add it.
+    const stockPurchaseCost = (stockDocs) =>
+      stockDocs.reduce((sum, doc) => {
+        const data  = doc.data();
+        const total = typeof data.total === 'number' ? data.total : 0;
+        return sum + (data.vat === true ? total : total * 1.15);
       }, 0);
 
     const completedDayTx   = dayTx.docs.filter(d => d.data().status === 'completed');
@@ -100,11 +90,11 @@ router.get('/analytics', async (req, res) => {
       sales.reduce((s, d) => s + txTotal(d), 0) - refunds.reduce((s, d) => s + txTotal(d), 0);
 
     // ── 1. Net Profit (selected day) ─────────────────────────────────
-    // Money out = fixed/operating expenses + money spent buying the products sold
-    const moneyIn      = netIncome(completedDayTx, refundedDayTx);
-    const dayExpenses  = dayExp.docs.reduce((s, d) => s + (d.data().amount || 0), 0);
-    const dayGoodsCost = costOfGoodsSold(completedDayTx);
-    const moneyOut     = dayExpenses + dayGoodsCost;
+    // Money out = fixed/operating expenses + money spent buying stock (stockMovements)
+    const moneyIn       = netIncome(completedDayTx, refundedDayTx);
+    const dayExpenses   = dayExp.docs.reduce((s, d) => s + (d.data().amount || 0), 0);
+    const dayStockSpend = stockPurchaseCost(dayStock.docs);
+    const moneyOut      = dayExpenses + dayStockSpend;
 
     // ── 2. Last 7 days chart ─────────────────────────────────────────
     const chart = [];

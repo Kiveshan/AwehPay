@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/widgets/editable_option_field.dart';
-
-part 'add_product_form.widgets.dart';
 import '../../../../../core/widgets/inventory_input_field.dart';
 import '../../../../../core/widgets/product_added_status.dart';
 import '../../../../../core/widgets/save_button.dart';
+
+part 'add_product_form.widgets.dart';
 
 class AddProductForm extends StatelessWidget {
   const AddProductForm({

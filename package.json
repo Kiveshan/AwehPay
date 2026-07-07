@@ -9,7 +9,7 @@
 "flutter:phone": "flutter run --dart-define=AWEHPAY_API_BASE_URL=http://192.168.0.176:5000",
 
 "flutter:staging": "flutter run --dart-define=AWEHPAY_API_BASE_URL=https://api.awehpay.co.za",
-    "dev": "concurrently -n backend,flutter -c cyan,green \"npm run backend\" \"npm run flutter:phone\"",
+    "dev": "concurrently -n backend,flutter -c cyan,green \"npm run backend\" \"npm run flutter:emulator\"",
     "dev:staging": "concurrently -n backend,flutter -c cyan,green \"npm run backend\" \"npm run flutter:staging\""
   },
   "devDependencies": {
