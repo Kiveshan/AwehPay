@@ -80,8 +80,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
     if (_skipTotalCostAutoCalc) return;
     final costPrice = _parseMoney(_costPriceController.text) ?? 0.0;
     final qty = int.tryParse(_quantityController.text.trim()) ?? 0;
-    var total = costPrice * qty;
-    if (_vatEnabled) total *= 1.15;
+    final total = costPrice * qty;
     final newText = total > 0 ? total.toStringAsFixed(2) : '';
     if (_totalCostController.text != newText) {
       _totalCostController.text = newText;

@@ -54,8 +54,7 @@ class EditableScannedProduct {
         ) ??
         0.0;
     final qty = int.tryParse(quantityController.text.trim()) ?? 0;
-    var total = cp * qty;
-    if (vatEnabled.value) total *= 1.15;
+    final total = cp * qty;
     final newText = total > 0 ? total.toStringAsFixed(2) : '';
     if (totalCostController.text != newText) {
       totalCostController.text = newText;
