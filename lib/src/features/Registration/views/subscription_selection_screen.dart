@@ -95,6 +95,35 @@ class _SubscriptionSelectionScreenState
                   ),
                 ),
               const SizedBox(height: 28),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF7B61FF), width: 1),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xFF7B61FF),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'A 30 day free trial of Premium is available to all new users.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7B61FF),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               if (_errorMessage != null && !_isLoading)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),

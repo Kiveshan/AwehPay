@@ -90,10 +90,8 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
   bool _isCardLocked({required String cardId, required String? tierName}) {
     final tier = (tierName ?? 'Basic').trim().toLowerCase();
     switch (cardId) {
-      case 'sales_tracking':
-        return tier == 'basic';
       case 'business_insights':
-        return tier == 'basic' || tier == 'plus';
+        return tier == 'basic';
       default:
         return false;
     }
@@ -218,10 +216,6 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                     subtitle: 'updated',
                                     iconSize: isLandscape ? 38 : 58,
                                     iconContainerSize: isLandscape ? 38 : 58,
-                                    isLocked: _isCardLocked(
-                                      cardId: 'sales_tracking',
-                                      tierName: tierName,
-                                    ),
                                     onTap: () =>
                                         context.push(AppRoutes.salesTracking),
                                   ),
