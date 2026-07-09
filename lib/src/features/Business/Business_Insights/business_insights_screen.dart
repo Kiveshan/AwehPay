@@ -159,7 +159,7 @@ class _BusinessInsightsScreenState extends State<BusinessInsightsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Image.asset('assets/images/logo.png', width: 48, height: 48, fit: BoxFit.contain),
+        Image.asset('assets/images/logo2.png', width: 72, height: 72, fit: BoxFit.contain),
         const Text(
           'Business Insights',
           style: TextStyle(color: Color(0xFF272A2F), fontSize: 24, fontWeight: FontWeight.w800),

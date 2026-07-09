@@ -212,8 +212,8 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Image.asset('assets/images/logo.png',
-            width: 48, height: 48, fit: BoxFit.contain),
+        Image.asset('assets/images/logo2.png',
+            width: 72, height: 72, fit: BoxFit.contain),
         Expanded(
           child: Text(
             title,

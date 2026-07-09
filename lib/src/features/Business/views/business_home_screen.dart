@@ -271,9 +271,9 @@ class _BusinessHeader extends StatelessWidget {
     return Row(
       children: [
         Image.asset(
-          'assets/images/logo.png',
-          width: 72,
-          height: 72,
+          'assets/images/logo2.png',
+          width: 96,
+          height: 96,
           fit: BoxFit.contain,
         ),
         const SizedBox(width: 14),
