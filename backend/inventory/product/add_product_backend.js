@@ -5,6 +5,7 @@ const {
   normalizeName,
   resolveBusinessContext,
 } = require('../service/inventory_helpers');
+const { checkSubscriptionLimit } = require('../../middleware/subscription_limits');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -103,6 +104,20 @@ router.post('/add-product', async (req, res) => {
     }
 
     const { businessId, uid } = await resolveBusinessContext({ auth, db, idToken });
+
+    // Check subscription limits for products
+    const limitCheck = await checkSubscriptionLimit(businessId, 'products');
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: limitCheck.error,
+        limitType: 'products',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        tierName: limitCheck.tierName,
+        requiresUpgrade: true
+      });
+    }
 
     const businessRef = db.collection('businesses').doc(businessId);
     const productRef = businessRef.collection('products').doc();

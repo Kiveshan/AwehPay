@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const axios = require('axios');
+const { checkSubscriptionLimit } = require('../middleware/subscription_limits');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -28,6 +29,20 @@ router.post('/qr-transaction', async (req, res) => {
     const userData = userDoc.data();
     const businessId = userData?.businessId;
     if (!businessId) return res.status(400).json({ error: 'No business linked to this account' });
+
+    // Check subscription limits for daily card payments
+    const limitCheck = await checkSubscriptionLimit(businessId, 'cardPayments');
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: limitCheck.error,
+        limitType: 'cardPayments',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        tierName: limitCheck.tierName,
+        requiresUpgrade: true
+      });
+    }
 
     const businessDoc = await db.collection('businesses').doc(businessId).get();
     const businessData = businessDoc.data();

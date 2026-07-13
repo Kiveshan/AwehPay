@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/services/api_service.dart';
+import '../../../../core/services/subscription_tier_service.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/widgets/upgrade_prompt_dialog.dart';
 
 class ServiceListScreen extends StatefulWidget {
   const ServiceListScreen({super.key});
@@ -13,11 +15,15 @@ class ServiceListScreen extends StatefulWidget {
 
 class _ServiceListScreenState extends State<ServiceListScreen> {
   final _apiService = ApiService();
+  final _subscriptionService = SubscriptionTierService();
   final _searchController = TextEditingController();
   List<_ServiceItem> _services = [];
   bool _isLoadingServices = true;
   String? _errorMessage;
   String _selectedCategory = 'Nail Care';
+  int? _serviceLimit;
+  int _currentServiceCount = 0;
+  bool _isCheckingLimit = false;
 
   List<_ServiceItem> get _filteredServices {
     final query = _searchController.text.toLowerCase().trim();
@@ -46,6 +52,30 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
   void initState() {
     super.initState();
     _loadServices();
+    _checkServiceLimit();
+  }
+
+  Future<void> _checkServiceLimit() async {
+    if (_isCheckingLimit) return;
+    
+    setState(() => _isCheckingLimit = true);
+    
+    try {
+      final businessId = await _apiService.getCurrentBusinessId();
+      if (businessId != null) {
+        final limitCheck = await _subscriptionService.checkLimit(businessId, LimitType.services);
+        if (mounted) {
+          setState(() {
+            _serviceLimit = limitCheck.limit;
+            _currentServiceCount = limitCheck.current;
+          });
+        }
+      }
+    } catch (error) {
+      // Silently fail limit check to not block UI
+    } finally {
+      if (mounted) setState(() => _isCheckingLimit = false);
+    }
   }
 
   @override
@@ -159,6 +189,17 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                                         },
                                       ),
                       ),
+                      if (_serviceLimit != null) ...[
+                        SizedBox(height: itemSpacing),
+                        Text(
+                          'Services: $_currentServiceCount/$_serviceLimit',
+                          style: TextStyle(
+                            color: _isAtLimit ? Colors.red : Colors.grey[600],
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -167,6 +208,44 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
           },
         ),
       ),
+      floatingActionButton: _buildAddServiceButton(),
+    );
+  }
+
+  Widget _buildAddServiceButton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_serviceLimit != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isAtLimit ? Colors.red[50] : Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isAtLimit ? Colors.red[200]! : Colors.blue[200]!,
+              ),
+            ),
+            child: Text(
+              '$_currentServiceCount/$_serviceLimit',
+              style: TextStyle(
+                color: _isAtLimit ? Colors.red[700] : Colors.blue[700],
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        FloatingActionButton(
+          onPressed: _isAtLimit ? null : _handleAddService,
+          backgroundColor: _isAtLimit ? Colors.grey[300] : const Color(0xFFDFA890),
+          child: Icon(
+            Icons.add,
+            color: _isAtLimit ? Colors.grey[500] : Colors.white,
+          ),
+        ),
+      ],
     );
   }
 
@@ -185,6 +264,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
 
       setState(() {
         _services = services.map(_ServiceItem.fromMap).toList();
+        _currentServiceCount = _services.length;
         if (_services.isNotEmpty &&
             !_services
                 .any((service) => service.category == _selectedCategory)) {
@@ -192,6 +272,9 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
         }
         _isLoadingServices = false;
       });
+      
+      // Re-check limit after loading services
+      _checkServiceLimit();
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -200,6 +283,31 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
         });
       }
     }
+  }
+
+  bool get _isAtLimit => _serviceLimit != null && _currentServiceCount >= _serviceLimit!;
+
+  Future<void> _handleAddService() async {
+    if (_isAtLimit && _serviceLimit != null) {
+      final tier = await _subscriptionService.getBusinessTier(
+        await _apiService.getCurrentBusinessId() ?? ''
+      );
+      if (mounted) {
+        await UpgradePromptDialog.show(
+          context,
+          limitType: 'services',
+          limit: _serviceLimit!,
+          current: _currentServiceCount,
+          tierName: tier?.name ?? 'Basic',
+        );
+      }
+      return;
+    }
+    context.push(AppRoutes.addService).then((_) {
+      if (mounted) {
+        _loadServices();
+      }
+    });
   }
 }
 
