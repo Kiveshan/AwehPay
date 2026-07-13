@@ -182,22 +182,117 @@ class _BusinessListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDisabled = business.status == 'disabled';
+    final subscriptionStatus = business.subscription.status;
+    
+    Color statusColor;
+    String statusText;
+    
+    switch (subscriptionStatus) {
+      case 'active':
+        statusColor = Colors.green;
+        statusText = 'Active';
+        break;
+      case 'pending_payment':
+        statusColor = Colors.orange;
+        statusText = 'Pending';
+        break;
+      case 'expired':
+        statusColor = Colors.red;
+        statusText = 'Expired';
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        statusText = 'Cancelled';
+        break;
+      case 'payment_failed':
+        statusColor = Colors.red;
+        statusText = 'Failed';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusText = 'Unknown';
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(
+          color: isDisabled ? Colors.red.shade300 : Colors.grey.shade200,
+          width: isDisabled ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(4),
       ),
       child: ListTile(
         onTap: onTap,
         title: Text(
           business.businessName,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDisabled ? Colors.grey.shade600 : null,
+            decoration: isDisabled ? TextDecoration.lineThrough : null,
+          ),
         ),
         subtitle: Text(business.registrationNumber),
-        trailing: Text(
-          'Subscription: ${business.subscription.tierName}',
-          style: const TextStyle(fontSize: 10),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Subscription: ${business.subscription.tierName}',
+              style: const TextStyle(fontSize: 10),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: statusColor, width: 1),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (business.subscription.trialEndDate != null) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: Colors.blue, width: 1),
+                    ),
+                    child: const Text(
+                      'Trial',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (isDisabled)
+              const Text(
+                'DISABLED',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.red,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+          ],
         ),
       ),
     );

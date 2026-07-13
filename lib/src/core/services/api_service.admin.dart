@@ -135,6 +135,27 @@ mixin _AdminApiMixin on _ApiServiceBase {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> disableBusiness({
+    required String businessId,
+    required bool disabled,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/admin/businesses/disable'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'businessId': businessId,
+        'disabled': disabled,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<List<Map<String, dynamic>>> listSubscriptionTiers() async {
     final response = await _client.get(
       _uri('/subscription-tiers/list'),

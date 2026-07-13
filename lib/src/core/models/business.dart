@@ -112,6 +112,7 @@ class BusinessSubscription {
   final DateTime? startedAt;
   final DateTime? expiresAt;
   final DateTime? nextBillingDate;
+  final DateTime? trialEndDate;
   final double price;
   final String currency;
   final String billingPeriod;
@@ -123,6 +124,7 @@ class BusinessSubscription {
     this.startedAt,
     this.expiresAt,
     this.nextBillingDate,
+    this.trialEndDate,
     required this.price,
     required this.currency,
     required this.billingPeriod,
@@ -136,6 +138,7 @@ class BusinessSubscription {
       startedAt: _parseTimestamp(map['startedAt']),
       expiresAt: _parseTimestamp(map['expiresAt']),
       nextBillingDate: _parseTimestamp(map['nextBillingDate']),
+      trialEndDate: _parseTimestamp(map['trialEndDate']),
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
       currency: map['currency'] as String? ?? 'ZAR',
       billingPeriod: map['billingPeriod'] as String? ?? '',
@@ -150,6 +153,7 @@ class BusinessSubscription {
       'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
       'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
       'nextBillingDate': nextBillingDate != null ? Timestamp.fromDate(nextBillingDate!) : null,
+      'trialEndDate': trialEndDate != null ? Timestamp.fromDate(trialEndDate!) : null,
       'price': price,
       'currency': currency,
       'billingPeriod': billingPeriod,

@@ -81,14 +81,17 @@ class AuthService {
         ? {
             'tierId': selectedTier.tierId,
             'tierName': selectedTier.name,
-            'status': selectedTier.price == 0 ? 'active' : 'pending_payment',
-            'startedAt': now,
+            'status': selectedTier.price == 0 ? 'active' : 'active',
+            'startedAt': selectedTier.price > 0 ? now : null,
             'expiresAt': null,
             'nextBillingDate': selectedTier.price == 0
                 ? null
                 : Timestamp.fromDate(
                     DateTime.now().add(const Duration(days: 30)),
                   ),
+            'trialEndDate': selectedTier.price > 0
+                ? Timestamp.fromDate(DateTime.now().add(const Duration(days: 30)))
+                : null,
             'price': selectedTier.price,
             'currency': selectedTier.currency,
             'billingPeriod': selectedTier.billingPeriod,
@@ -100,6 +103,7 @@ class AuthService {
             'startedAt': now,
             'expiresAt': null,
             'nextBillingDate': null,
+            'trialEndDate': null,
             'price': 0,
             'currency': 'ZAR',
             'billingPeriod': 'free',

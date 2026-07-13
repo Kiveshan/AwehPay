@@ -68,6 +68,7 @@ const createCashTransaction = require('./purchases/create_cash_transaction');
 const createQrTransaction = require('./purchases/create_qr_transaction');
 const verifyPayment = require('./purchases/verify_payment');
 const paystackWebhook = require('./webhooks/paystack');
+const googlePlayWebhook = require('./webhooks/google_play');
 const productListBackend = require('./inventory/product/product_list_backend');
 const barcodeScannerBackend = require('./inventory/product/barcode_scanner_backend');
 const reviewScannedProductsBackend = require('./inventory/product/review_scanned_products_backend');
@@ -87,8 +88,9 @@ const app = express();
 
 app.use(cors());
 
-// Webhook must be registered before express.json() — needs raw body for HMAC verification
+// Webhooks must be registered before express.json() — needs raw body for HMAC verification
 app.use('/webhooks/paystack', paystackWebhook);
+app.use('/webhooks/google-play', googlePlayWebhook);
 
 app.use(express.json());
 app.use('/inventory/product', addProductBackend);
@@ -134,6 +136,73 @@ app.post('/verify-token', async (req, res) => {
     }
 
     const decodedToken = await auth.verifyIdToken(idToken);
+
+    // Check subscription status
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const userData = userDoc.data();
+    const businessId = userData.businessId;
+
+    if (businessId) {
+      const businessDoc = await db.collection('businesses').doc(businessId).get();
+      if (businessDoc.exists) {
+        const businessData = businessDoc.data();
+        const subscription = businessData.subscription || {};
+        const subscriptionStatus = subscription.status || 'active';
+
+        // Block login for invalid subscription states
+        const blockedStatuses = ['expired', 'cancelled', 'payment_failed'];
+        if (blockedStatuses.includes(subscriptionStatus)) {
+          return res.status(403).json({
+            success: false,
+            error: `Subscription ${subscriptionStatus}. Please renew your subscription to access the system.`,
+            subscriptionStatus,
+          });
+        }
+
+        // Check if trial has expired
+        if (subscription.trialEndDate) {
+          const trialEnd = subscription.trialEndDate.toDate();
+          const now = new Date();
+          if (now > trialEnd && subscriptionStatus === 'active') {
+            // Trial expired, check if subscription is still valid
+            if (!subscription.expiresAt || new Date(subscription.expiresAt.toDate()) < now) {
+              await db.collection('businesses').doc(businessId).update({
+                'subscription.status': 'expired',
+                'status': 'disabled',
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              return res.status(403).json({
+                success: false,
+                error: 'Trial period expired. Please subscribe to continue.',
+                subscriptionStatus: 'expired',
+              });
+            }
+          }
+        }
+
+        // Check if subscription has expired
+        if (subscription.expiresAt) {
+          const subscriptionEnd = subscription.expiresAt.toDate();
+          const now = new Date();
+          if (now > subscriptionEnd && subscriptionStatus === 'active') {
+            await db.collection('businesses').doc(businessId).update({
+              'subscription.status': 'expired',
+              'status': 'disabled',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return res.status(403).json({
+              success: false,
+              error: 'Subscription expired. Please renew to continue.',
+              subscriptionStatus: 'expired',
+            });
+          }
+        }
+      }
+    }
 
     res.json({
       success: true,

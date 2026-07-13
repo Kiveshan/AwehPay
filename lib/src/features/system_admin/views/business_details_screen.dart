@@ -20,6 +20,8 @@ class BusinessDetailsScreen extends StatefulWidget {
 class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
   final _service = AdminBusinessService();
   bool _isLoading = true;
+  bool _isDisabling = false;
+  Business? _currentBusiness;
 
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -54,6 +56,7 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
       return;
     }
 
+    _currentBusiness = business;
     _businessNameController.text = business.businessName;
     _registrationController.text = business.registrationNumber;
     _sarsController.text = business.sarsReferenceNumber;
@@ -72,9 +75,61 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
     }
   }
 
+  void _toggleDisabled(bool value) {
+    final business = _currentBusiness;
+    if (business == null) return;
+
+    setState(() => _isDisabling = true);
+
+    _service.disableBusiness(business.businessId, !value).then((_) {
+      if (mounted) {
+        setState(() {
+          _currentBusiness = Business(
+            businessId: business.businessId,
+            ownerId: business.ownerId,
+            businessName: business.businessName,
+            businessType: business.businessType,
+            registrationNumber: business.registrationNumber,
+            sarsReferenceNumber: business.sarsReferenceNumber,
+            description: business.description,
+            phoneNumber: business.phoneNumber,
+            email: business.email,
+            address: business.address,
+            status: value ? 'active' : 'disabled',
+            verification: business.verification,
+            subscription: business.subscription,
+            createdAt: business.createdAt,
+            updatedAt: business.updatedAt,
+          );
+          _isDisabling = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value
+                  ? 'Business enabled successfully'
+                  : 'Business disabled successfully',
+            ),
+          ),
+        );
+      }
+    }).catchError((e) {
+      if (mounted) {
+        setState(() => _isDisabling = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to toggle business status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final business = widget.business;
+    final currentBusiness = _currentBusiness ?? business;
 
     if (business == null) {
       return const AdminScaffold(
@@ -96,6 +151,31 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    const _SectionTitle('Business Status'),
+                    const Spacer(),
+                    Switch(
+                      value: currentBusiness?.status != 'disabled',
+                      onChanged: _isDisabling ? null : _toggleDisabled,
+                      activeColor: Colors.green,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  currentBusiness?.status == 'disabled' ? 'Business is disabled' : 'Business is active',
+                  style: TextStyle(
+                    color: currentBusiness?.status == 'disabled' ? Colors.red : Colors.green,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const _SectionTitle('Subscription Status'),
+                const SizedBox(height: 8),
+                _buildSubscriptionStatus(currentBusiness),
+                const SizedBox(height: 16),
                 const _SectionTitle('Personal Details'),
                 const SizedBox(height: 16),
                 Row(
@@ -209,4 +289,109 @@ class _SectionTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _buildSubscriptionStatus(Business? business) {
+  if (business == null) return const SizedBox.shrink();
+
+  final subscriptionStatus = business.subscription.status;
+  final trialEndDate = business.subscription.trialEndDate;
+  final subscriptionEndDate = business.subscription.expiresAt;
+
+  Color statusColor;
+  String statusText;
+
+  switch (subscriptionStatus) {
+    case 'active':
+      statusColor = Colors.green;
+      statusText = 'Active';
+      break;
+    case 'pending_payment':
+      statusColor = Colors.orange;
+      statusText = 'Pending Payment';
+      break;
+    case 'expired':
+      statusColor = Colors.red;
+      statusText = 'Expired';
+      break;
+    case 'cancelled':
+      statusColor = Colors.red;
+      statusText = 'Cancelled';
+      break;
+    case 'payment_failed':
+      statusColor = Colors.red;
+      statusText = 'Payment Failed';
+      break;
+    default:
+      statusColor = Colors.grey;
+      statusText = 'Unknown';
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: statusColor, width: 1),
+            ),
+            child: Text(
+              statusText,
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (trialEndDate != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.blue, width: 1),
+              ),
+              child: Text(
+                'Trial',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+      if (trialEndDate != null) ...[
+        const SizedBox(height: 4),
+        Text(
+          'Trial ends: ${_formatDate(trialEndDate)}',
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF6C7078),
+          ),
+        ),
+      ],
+      if (subscriptionEndDate != null) ...[
+        const SizedBox(height: 4),
+        Text(
+          'Subscription ends: ${_formatDate(subscriptionEndDate)}',
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF6C7078),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+String _formatDate(DateTime date) {
+  return '${date.day}/${date.month}/${date.year}';
 }
