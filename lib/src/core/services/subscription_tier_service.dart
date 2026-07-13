@@ -95,6 +95,28 @@ class SubscriptionTierService {
   }
 
   Future<LimitCheckResult> checkLimit(String businessId, LimitType type) async {
+    // Check if business is on an active trial
+    final businessDoc = await _firestore.collection('businesses').doc(businessId).get();
+    if (businessDoc.exists) {
+      final businessData = businessDoc.data();
+      final subscription = businessData?['subscription'] as Map<String, dynamic>?;
+      final trialEndDate = subscription?['trialEndDate'];
+      
+      if (trialEndDate != null) {
+        final trialEnd = trialEndDate is Timestamp ? trialEndDate.toDate() : DateTime.parse(trialEndDate.toString());
+        if (DateTime.now().isBefore(trialEnd)) {
+          // Trial is active, no limits apply
+          return LimitCheckResult(
+            allowed: true,
+            limit: null,
+            current: await getCurrentCount(businessId, type),
+            grandfathered: false,
+            onTrial: true,
+          );
+        }
+      }
+    }
+
     final limits = await getBusinessLimits(businessId);
     final currentCount = await getCurrentCount(businessId, type);
     
@@ -196,11 +218,13 @@ class LimitCheckResult {
   final int? limit;
   final int current;
   final bool grandfathered;
+  final bool onTrial;
 
   LimitCheckResult({
     required this.allowed,
     this.limit,
     required this.current,
     required this.grandfathered,
+    this.onTrial = false,
   });
 }

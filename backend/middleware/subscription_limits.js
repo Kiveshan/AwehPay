@@ -18,6 +18,18 @@ async function checkSubscriptionLimit(businessId, limitType, currentCount = null
     const subscription = businessData.subscription || {};
     const tierId = subscription.tierId || 'basic';
 
+    // Check if business is on an active 30-day trial
+    const trialEndDate = subscription.trialEndDate;
+    if (trialEndDate) {
+      const now = new Date();
+      const trialEnd = trialEndDate.toDate ? trialEndDate.toDate() : new Date(trialEndDate);
+      
+      // If trial is still active, allow all operations without limits
+      if (now < trialEnd) {
+        return { allowed: true, limit: null, current: currentCount, onTrial: true };
+      }
+    }
+
     // Get subscription tier limits
     const tierDoc = await db.collection('subscriptionTiers').doc(tierId).get();
     if (!tierDoc.exists) {

@@ -12,6 +12,7 @@ typedef _HomeData = ({
   String businessName,
   DateTime? insightsUpdatedAt,
   String? tierName,
+  bool onTrial,
 });
 
 class BusinessHomeScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
         businessName: 'Business',
         insightsUpdatedAt: null,
         tierName: null,
+        onTrial: false,
       );
 
     final userDoc = await FirebaseFirestore.instance
@@ -44,6 +46,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
         businessName: 'Business',
         insightsUpdatedAt: null,
         tierName: null,
+        onTrial: false,
       );
     }
 
@@ -71,6 +74,14 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
         businessData?['subscription'] as Map<String, dynamic>?;
     final tierName = subscriptionMap?['tierName'] as String?;
 
+    // Check if business is on an active trial
+    bool onTrial = false;
+    final trialEndDate = subscriptionMap?['trialEndDate'];
+    if (trialEndDate != null) {
+      final trialEnd = trialEndDate is Timestamp ? trialEndDate.toDate() : DateTime.parse(trialEndDate.toString());
+      onTrial = DateTime.now().isBefore(trialEnd);
+    }
+
     DateTime? insightsUpdatedAt;
     if (summariesSnap.docs.isNotEmpty) {
       final ts = summariesSnap.docs.first.data() is Map
@@ -84,10 +95,14 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
       businessName: name,
       insightsUpdatedAt: insightsUpdatedAt,
       tierName: tierName,
+      onTrial: onTrial,
     );
   }
 
-  bool _isCardLocked({required String cardId, required String? tierName}) {
+  bool _isCardLocked({required String cardId, required String? tierName, required bool onTrial}) {
+    // If on trial, no features are locked
+    if (onTrial) return false;
+
     final tier = (tierName ?? 'Basic').trim().toLowerCase();
     switch (cardId) {
       case 'business_insights':
@@ -164,6 +179,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                           final insightsSubtitle = _formatRelativeTime(
                               snapshot.data?.insightsUpdatedAt);
                           final tierName = snapshot.data?.tierName;
+                          final onTrial = snapshot.data?.onTrial ?? false;
                           return LayoutBuilder(
                             builder: (context, constraints) {
                               const spacing = 16.0;
@@ -233,6 +249,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                                     isLocked: _isCardLocked(
                                       cardId: 'business_insights',
                                       tierName: tierName,
+                                      onTrial: onTrial,
                                     ),
                                     onTap: () => context
                                         .push(AppRoutes.businessInsights),
