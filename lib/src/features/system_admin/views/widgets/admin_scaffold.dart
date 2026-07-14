@@ -30,12 +30,17 @@ class AdminScaffold extends StatelessWidget {
                     height: 72,
                     fit: BoxFit.contain,
                   ),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color(0xFF272A2F),
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF272A2F),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   InkWell(
