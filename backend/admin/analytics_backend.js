@@ -45,14 +45,9 @@ router.post('/summary', async (req, res) => {
 
     await verifyAdmin(idToken);
 
-    const [
-      businessesSnap,
-      usersSnap,
-      tiersSnap,
-    ] = await Promise.all([
+    const [businessesSnap, usersSnap] = await Promise.all([
       db.collection('businesses').count().get(),
       db.collection('users').count().get(),
-      db.collection('subscriptionTiers').count().get(),
     ]);
 
     // Fetch tiers and businesses for subscriber counts and status breakdown
@@ -64,6 +59,9 @@ router.post('/summary', async (req, res) => {
     const tierMap = new Map();
     allTiersSnap.docs.forEach((doc) => {
       const data = doc.data();
+      if (!data.isActive) {
+        return;
+      }
       tierMap.set(doc.id, {
         tierId: doc.id,
         tierName: data.name || data.code || doc.id,
@@ -107,7 +105,7 @@ router.post('/summary', async (req, res) => {
       summary: {
         totalBusinesses: businessesSnap.data().count,
         totalUsers: usersSnap.data().count,
-        totalSubscriptionTiers: tiersSnap.data().count,
+        totalSubscriptionTiers: tierMap.size,
         activeBusinesses,
         inactiveBusinesses,
         tierSubscribers,

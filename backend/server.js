@@ -67,6 +67,7 @@ const getProductsServices = require('./purchases/get_products_services');
 const createCashTransaction = require('./purchases/create_cash_transaction');
 const createQrTransaction = require('./purchases/create_qr_transaction');
 const verifyPayment = require('./purchases/verify_payment');
+const verifyGooglePlayPurchase = require('./purchases/verify_google_play_purchase');
 const paystackWebhook = require('./webhooks/paystack');
 const googlePlayWebhook = require('./webhooks/google_play');
 const productListBackend = require('./inventory/product/product_list_backend');
@@ -88,16 +89,22 @@ const app = express();
 
 app.use(cors());
 
-// Webhooks must be registered before express.json() — needs raw body for HMAC verification
+// Paystack webhook must be registered before express.json() — it needs the raw body for
+// HMAC signature verification (see webhooks/paystack.js, which applies express.raw() itself).
 app.use('/webhooks/paystack', paystackWebhook);
-app.use('/webhooks/google-play', googlePlayWebhook);
 
 app.use(express.json());
+
+// Google Play RTDN arrives as a Pub/Sub push (plain JSON body, OIDC bearer auth) rather
+// than an HMAC-signed payload, so — unlike Paystack — it can sit after express.json().
+app.use('/webhooks/google-play', googlePlayWebhook);
+
 app.use('/inventory/product', addProductBackend);
 app.use('/purchases', getProductsServices);
 app.use('/purchases', createCashTransaction);
 app.use('/purchases', createQrTransaction);
 app.use('/purchases', verifyPayment);
+app.use('/purchases', verifyGooglePlayPurchase);
 app.use('/business/insights', fixedExpenseBackend);
 app.use('/business/insights', analyticsBackend);
 app.use('/inventory/service', addServiceBackend);

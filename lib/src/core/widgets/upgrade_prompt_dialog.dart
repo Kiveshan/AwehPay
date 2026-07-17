@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../app.dart';
+import '../models/subscription_tier.dart';
+import '../services/purchase_service.dart';
+import '../services/subscription_tier_service.dart';
+
 class UpgradePromptDialog extends StatelessWidget {
   final String limitType;
   final int limit;
@@ -292,19 +297,51 @@ class UpgradePromptDialog extends StatelessWidget {
     );
   }
 
-  void _navigateToUpgrade(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Subscription upgrade flow coming soon!',
-          style: TextStyle(fontWeight: FontWeight.w500),
-        ),
-        backgroundColor: const Color(0xFFDFA890),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  // Kicks off a real Google Play purchase for the recommended paid tier. Feedback for
+  // the async result (pending/success/error) is shown globally via app.dart's listener
+  // on PurchaseService.statusStream, since this dialog is already dismissed by the time
+  // the purchase actually resolves.
+  Future<void> _navigateToUpgrade(BuildContext context) async {
+    final messenger = rootScaffoldMessengerKey.currentState;
+
+    try {
+      final tiers = await SubscriptionTierService().getActiveTiers();
+      final playTiers = tiers
+          .where((t) => t.playProductId != null && t.playProductId!.isNotEmpty)
+          .toList();
+
+      if (playTiers.isEmpty) {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Upgrades are not available yet. Please check back soon.')),
+        );
+        return;
+      }
+
+      final SubscriptionTier targetTier = playTiers.firstWhere(
+        (t) => t.isRecommended,
+        orElse: () => playTiers.first,
+      );
+
+      if (!await PurchaseService.instance.isAvailable()) {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Google Play Billing is unavailable on this device.')),
+        );
+        return;
+      }
+
+      final response =
+          await PurchaseService.instance.queryProducts({targetTier.playProductId!});
+      if (response.productDetails.isEmpty) {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('This plan is not available for purchase right now.')),
+        );
+        return;
+      }
+
+      await PurchaseService.instance.buySubscription(response.productDetails.first);
+    } catch (e) {
+      messenger?.showSnackBar(SnackBar(content: Text('Could not start checkout: $e')));
+    }
   }
 
   static Future<void> show(

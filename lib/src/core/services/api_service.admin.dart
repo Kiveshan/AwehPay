@@ -180,6 +180,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     required bool isRecommended,
     required List<String> features,
     required Map<String, dynamic> limits,
+    String? playProductId,
+    String? playBasePlanId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -205,6 +207,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
         'isRecommended': isRecommended,
         'features': features,
         'limits': limits,
+        'playProductId': playProductId,
+        'playBasePlanId': playBasePlanId,
       }),
     );
 
@@ -225,6 +229,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     bool? isRecommended,
     List<String>? features,
     Map<String, dynamic>? limits,
+    String? playProductId,
+    String? playBasePlanId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -247,6 +253,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     if (isRecommended != null) body['isRecommended'] = isRecommended;
     if (features != null) body['features'] = features;
     if (limits != null) body['limits'] = limits;
+    if (playProductId != null) body['playProductId'] = playProductId;
+    if (playBasePlanId != null) body['playBasePlanId'] = playBasePlanId;
 
     final response = await _client.put(
       _uri('/subscription-tiers/$tierId'),

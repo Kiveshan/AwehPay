@@ -35,6 +35,9 @@ class _EditSubscriptionTierScreenState
   final _maxServicesController = TextEditingController();
   final _maxCardPaymentsController = TextEditingController();
 
+  final _playProductIdController = TextEditingController();
+  final _playBasePlanIdController = TextEditingController();
+
   bool _isActive = true;
   bool _isRecommended = false;
   bool _barcodeScanner = false;
@@ -73,6 +76,9 @@ class _EditSubscriptionTierScreenState
     _maxServicesController.text = tier.limits.maxServices?.toString() ?? '';
     _maxCardPaymentsController.text =
         tier.limits.maxCardPaymentsPerDay?.toString() ?? '';
+
+    _playProductIdController.text = tier.playProductId ?? '';
+    _playBasePlanIdController.text = tier.playBasePlanId ?? '';
 
     _isActive = tier.isActive;
     _isRecommended = tier.isRecommended;
@@ -120,6 +126,9 @@ class _EditSubscriptionTierScreenState
       _errorMessage = null;
     });
 
+    final playProductId = _playProductIdController.text.trim();
+    final playBasePlanId = _playBasePlanIdController.text.trim();
+
     try {
       if (_isEditing) {
         await _apiService.updateSubscriptionTier(
@@ -136,6 +145,8 @@ class _EditSubscriptionTierScreenState
           isRecommended: _isRecommended,
           features: features,
           limits: limits,
+          playProductId: playProductId.isEmpty ? null : playProductId,
+          playBasePlanId: playBasePlanId.isEmpty ? null : playBasePlanId,
         );
       } else {
         await _apiService.createSubscriptionTier(
@@ -151,6 +162,8 @@ class _EditSubscriptionTierScreenState
           isRecommended: _isRecommended,
           features: features,
           limits: limits,
+          playProductId: playProductId.isEmpty ? null : playProductId,
+          playBasePlanId: playBasePlanId.isEmpty ? null : playBasePlanId,
         );
       }
 
@@ -179,6 +192,8 @@ class _EditSubscriptionTierScreenState
     _maxProductsController.dispose();
     _maxServicesController.dispose();
     _maxCardPaymentsController.dispose();
+    _playProductIdController.dispose();
+    _playBasePlanIdController.dispose();
     super.dispose();
   }
 
@@ -267,6 +282,19 @@ class _EditSubscriptionTierScreenState
                 label: 'Max Card Payments/Day (leave blank for unlimited)',
                 controller: _maxCardPaymentsController,
                 keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 24),
+              _buildSectionTitle('Google Play Billing'),
+              AdminTextField(
+                label: 'Play Product ID (leave blank if not sold via Play)',
+                hintText: 'e.g. awehbiz_plus',
+                controller: _playProductIdController,
+              ),
+              const SizedBox(height: 12),
+              AdminTextField(
+                label: 'Play Base Plan ID',
+                hintText: 'e.g. plus-monthly',
+                controller: _playBasePlanIdController,
               ),
               const SizedBox(height: 16),
               _buildToggle('Active', _isActive, (v) => setState(() => _isActive = v)),

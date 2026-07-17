@@ -66,6 +66,8 @@ router.post('/create', async (req, res) => {
       isRecommended,
       features,
       limits,
+      playProductId,
+      playBasePlanId,
     } = req.body;
 
     if (!name || !code) {
@@ -89,6 +91,8 @@ router.post('/create', async (req, res) => {
       isRecommended: typeof isRecommended === 'boolean' ? isRecommended : false,
       features: Array.isArray(features) ? features : [],
       limits: limits || {},
+      playProductId: playProductId || null,
+      playBasePlanId: playBasePlanId || null,
       createdBy: adminUser.uid,
       updatedBy: adminUser.uid,
       createdAt: now,
@@ -129,6 +133,8 @@ router.put('/:tierId', async (req, res) => {
       isRecommended,
       features,
       limits,
+      playProductId,
+      playBasePlanId,
     } = req.body;
 
     const tierRef = db.collection('subscriptionTiers').doc(tierId);
@@ -155,6 +161,8 @@ router.put('/:tierId', async (req, res) => {
     if (isRecommended !== undefined) updateData.isRecommended = isRecommended;
     if (features !== undefined) updateData.features = features;
     if (limits !== undefined) updateData.limits = limits;
+    if (playProductId !== undefined) updateData.playProductId = playProductId;
+    if (playBasePlanId !== undefined) updateData.playBasePlanId = playBasePlanId;
 
     await tierRef.update(updateData);
 

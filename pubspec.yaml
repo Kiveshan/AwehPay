@@ -28,6 +28,8 @@ dependencies:
   pdfx: ^2.7.1
   local_auth: ^2.3.0
   flutter_secure_storage: ^9.2.4
+  in_app_purchase: ^3.2.0
+  in_app_purchase_android: ^0.5.1
 
 dev_dependencies:
   flutter_test:
