@@ -284,8 +284,8 @@ class _BusinessHeader extends StatelessWidget {
       children: [
         Image.asset(
           'assets/images/logo2.png',
-          width: 96,
-          height: 96,
+          width: 76,
+          height: 76,
           fit: BoxFit.contain,
         ),
         const SizedBox(width: 14),
