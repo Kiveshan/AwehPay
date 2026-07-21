@@ -31,10 +31,8 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
   String? _emailError;
   String? _passwordError;
   bool _obscurePassword = true;
-  bool _termsAccepted = false;
-  bool _privacyAccepted = false;
-  String? _termsError;
-  String? _privacyError;
+  bool _consentAccepted = false;
+  String? _consentError;
   late final TapGestureRecognizer _termsLinkRecognizer;
   late final TapGestureRecognizer _privacyLinkRecognizer;
 
@@ -95,15 +93,16 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
     registrationDraft.phoneNumber = phoneNumber;
     registrationDraft.email = email;
     registrationDraft.password = password;
-    registrationDraft.termsAccepted = _termsAccepted;
-    registrationDraft.privacyAccepted = _privacyAccepted;
+    registrationDraft.termsAccepted = _consentAccepted;
+    registrationDraft.privacyAccepted = _consentAccepted;
 
     setState(() {
-      _termsError = _termsAccepted ? null : 'You must accept the Terms and Conditions';
-      _privacyError = _privacyAccepted ? null : 'You must accept the Privacy Policy';
+      _consentError = _consentAccepted
+          ? null
+          : 'You must accept the Terms and Conditions and Privacy Policy';
     });
 
-    if (_termsError != null || _privacyError != null) {
+    if (_consentError != null) {
       return;
     }
 
@@ -112,11 +111,14 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
 
   Widget _buildConsentCheckbox({
     required bool value,
-    required String linkLabel,
-    required TapGestureRecognizer recognizer,
     required String? error,
     required ValueChanged<bool> onChanged,
   }) {
+    const linkStyle = TextStyle(
+      decoration: TextDecoration.underline,
+      color: Color(0xFFE8A28D),
+      fontWeight: FontWeight.w600,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,13 +138,15 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                     children: [
                       const TextSpan(text: 'I accept the '),
                       TextSpan(
-                        text: linkLabel,
-                        style: const TextStyle(
-                          decoration: TextDecoration.underline,
-                          color: Color(0xFFE8A28D),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        recognizer: recognizer,
+                        text: 'Terms and Conditions',
+                        style: linkStyle,
+                        recognizer: _termsLinkRecognizer,
+                      ),
+                      const TextSpan(text: ' and '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: linkStyle,
+                        recognizer: _privacyLinkRecognizer,
                       ),
                     ],
                   ),
@@ -222,27 +226,12 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
               ),
               const SizedBox(height: 24),
               _buildConsentCheckbox(
-                value: _termsAccepted,
-                linkLabel: 'Terms and Conditions',
-                recognizer: _termsLinkRecognizer,
-                error: _termsError,
+                value: _consentAccepted,
+                error: _consentError,
                 onChanged: (checked) {
                   setState(() {
-                    _termsAccepted = checked;
-                    _termsError = null;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildConsentCheckbox(
-                value: _privacyAccepted,
-                linkLabel: 'Privacy Policy',
-                recognizer: _privacyLinkRecognizer,
-                error: _privacyError,
-                onChanged: (checked) {
-                  setState(() {
-                    _privacyAccepted = checked;
-                    _privacyError = null;
+                    _consentAccepted = checked;
+                    _consentError = null;
                   });
                 },
               ),
