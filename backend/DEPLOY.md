@@ -33,6 +33,10 @@ Other required env vars:
 |---|---|
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (use the **live** key in prod) |
 | `PORT` | Auto-set by Beanstalk (8080). Local falls back to 5000. Do **not** set manually in EB. |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_B64` | base64 of the Play Developer API service account JSON key (same base64 pattern as `FIREBASE_SERVICE_ACCOUNT_B64` above — this is a **separate** service account, created via Play Console → Users and permissions, not the Firebase Admin one). Used by `backend/google_play/google_play_client.js`. |
+| `GOOGLE_PLAY_PACKAGE_NAME` | Optional — defaults to `com.awehpay.app` in code, only set this if the package name ever changes. |
+| `PUBSUB_PUSH_AUDIENCE` | The exact Pub/Sub push endpoint URL (e.g. `https://api.awehpay.co.za/webhooks/google-play`) — required once Real-time Developer Notifications are wired up. |
+| `PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL` | The service account email the Pub/Sub push subscription authenticates as — required once RTDN is wired up. |
 
 > The service-account JSON file is gitignored and excluded from the CI bundle. It is
 > never committed and never baked into the deployment artifact.

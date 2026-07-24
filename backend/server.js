@@ -191,11 +191,15 @@ app.post('/verify-token', async (req, res) => {
           }
         }
 
-        // Check if subscription has expired
+        // Check if subscription has expired. Applies to 'active' and to
+        // 'cancel_at_period_end' (a Play Billing cancellation that hasn't reached the end
+        // of its paid period yet) — both should auto-expire once expiresAt passes.
         if (subscription.expiresAt) {
           const subscriptionEnd = subscription.expiresAt.toDate();
           const now = new Date();
-          if (now > subscriptionEnd && subscriptionStatus === 'active') {
+          const stillWithinGrantedAccess =
+            subscriptionStatus === 'active' || subscriptionStatus === 'cancel_at_period_end';
+          if (now > subscriptionEnd && stillWithinGrantedAccess) {
             await db.collection('businesses').doc(businessId).update({
               'subscription.status': 'expired',
               'status': 'disabled',

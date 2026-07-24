@@ -144,9 +144,11 @@ async function handleSubscriptionEvent(businessDoc, notificationType, purchaseTo
 
     case NOTIFICATION_TYPE.SUBSCRIPTION_CANCELED:
       // Play cancellations retain access through the already-paid period — do not revoke
-      // immediately. subscription.expiresAt (set at purchase/renewal time) still governs
-      // access; /verify-token's expiry check disables the business once that date passes.
-      updateData['subscription.status'] = 'canceled';
+      // immediately. Use a distinct status (not the existing 'cancelled', which every other
+      // part of this app — the /verify-token gate, admin overrides — treats as an immediate
+      // block) so login stays allowed. subscription.expiresAt still governs access;
+      // /verify-token's expiry check auto-transitions this to 'expired' once that date passes.
+      updateData['subscription.status'] = 'cancel_at_period_end';
       break;
 
     case NOTIFICATION_TYPE.SUBSCRIPTION_ON_HOLD:
