@@ -134,6 +134,34 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// Required by Google Play's Data safety declaration: a public URL users can use to
+// request deletion of their account and associated data.
+app.get('/delete-account', (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete Your AwehBiz Account</title>
+  <style>
+    body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 20px; color: #272A2F; line-height: 1.6; }
+    h1 { font-size: 24px; }
+    a { color: #7B61FF; }
+  </style>
+</head>
+<body>
+  <h1>Delete Your AwehBiz Account</h1>
+  <p>To request deletion of your AwehBiz account and all associated data, email
+    <a href="mailto:info@smart-builders.co.za">info@smart-builders.co.za</a> from the
+    address registered on your account, with the subject line "Account Deletion Request".</p>
+  <p>Please include your business name and registered email address so we can locate
+    your account.</p>
+  <p>We will process your request and permanently delete your account and associated
+    data within 30 days.</p>
+</body>
+</html>`);
+});
+
 app.post('/verify-token', async (req, res) => {
   try {
     const { idToken } = req.body;
