@@ -318,6 +318,10 @@ Widget _buildSubscriptionStatus(Business? business) {
       statusColor = Colors.red;
       statusText = 'Cancelled';
       break;
+    case 'cancel_at_period_end':
+      statusColor = Colors.orange;
+      statusText = 'Cancelling (active until period end)';
+      break;
     case 'payment_failed':
       statusColor = Colors.red;
       statusText = 'Payment Failed';

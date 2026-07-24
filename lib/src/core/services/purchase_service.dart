@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:in_app_purchase_android/billing_client_wrappers.dart' show ReplacementMode;
 
 import 'api_service.dart';
 
@@ -68,6 +70,61 @@ class PurchaseService {
     return _iap.buyNonConsumable(
       purchaseParam: PurchaseParam(productDetails: product),
     );
+  }
+
+  /// Buys [newProduct] as a replacement for the business's existing active subscription
+  /// to [currentProductId] (a tier upgrade or downgrade). Uses Play Billing's subscription
+  /// replace mechanism (`ChangeSubscriptionParam`) so the customer is prorated/switched to
+  /// the new plan rather than ending up with two parallel subscriptions or a rejected
+  /// purchase — a plain `buySubscription` call must never be used when the business already
+  /// has an active Play subscription to a different product.
+  ///
+  /// Falls back to a plain purchase if the old purchase record can't be found (e.g. the
+  /// business's "current" tier was never actually Play-billed, such as being on a trial).
+  Future<void> buySubscriptionChange({
+    required ProductDetails newProduct,
+    required String currentProductId,
+  }) async {
+    final oldPurchase = await _fetchCurrentPurchase(currentProductId);
+    if (oldPurchase == null) {
+      return buySubscription(newProduct);
+    }
+
+    await _iap.buyNonConsumable(
+      purchaseParam: GooglePlayPurchaseParam(
+        productDetails: newProduct,
+        changeSubscriptionParam: ChangeSubscriptionParam(
+          oldPurchaseDetails: oldPurchase,
+          // withTimeProration is Play's own default and (unlike chargeProratedPrice)
+          // works for both upgrades and downgrades, so it's the safe generic choice here.
+          replacementMode: ReplacementMode.withTimeProration,
+        ),
+      ),
+    );
+  }
+
+  /// Fetches the currently active Play purchase details for [currentProductId] by
+  /// triggering a restore and capturing the matching purchase from the stream.
+  /// `ChangeSubscriptionParam` requires the actual purchase object being replaced, and
+  /// this plugin only exposes past purchases via the purchaseStream, not a direct query.
+  Future<GooglePlayPurchaseDetails?> _fetchCurrentPurchase(String currentProductId) async {
+    final completer = Completer<GooglePlayPurchaseDetails?>();
+    late final StreamSubscription<List<PurchaseDetails>> probe;
+    probe = _iap.purchaseStream.listen((purchases) {
+      for (final purchase in purchases) {
+        if (purchase.productID == currentProductId && purchase is GooglePlayPurchaseDetails) {
+          if (!completer.isCompleted) completer.complete(purchase);
+        }
+      }
+    });
+
+    await restorePurchases();
+    final result = await completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => null,
+    );
+    await probe.cancel();
+    return result;
   }
 
   Future<void> restorePurchases() => _iap.restorePurchases();

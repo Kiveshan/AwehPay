@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
@@ -297,18 +299,37 @@ class UpgradePromptDialog extends StatelessWidget {
     );
   }
 
-  // Kicks off a real Google Play purchase for the recommended paid tier. Feedback for
-  // the async result (pending/success/error) is shown globally via app.dart's listener
-  // on PurchaseService.statusStream, since this dialog is already dismissed by the time
-  // the purchase actually resolves.
+  // Kicks off a real Google Play purchase for the next tier up from the business's
+  // current one. Feedback for the async result (pending/success/error) is shown globally
+  // via app.dart's listener on PurchaseService.statusStream, since this dialog is already
+  // dismissed by the time the purchase actually resolves.
   Future<void> _navigateToUpgrade(BuildContext context) async {
     final messenger = rootScaffoldMessengerKey.currentState;
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final businessId = userDoc.data()?['businessId'] as String?;
+      if (businessId == null || businessId.isEmpty) return;
+
+      final businessDoc = await FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(businessId)
+          .get();
+      final currentSubscription =
+          businessDoc.data()?['subscription'] as Map<String, dynamic>? ?? {};
+      final currentTierId = currentSubscription['tierId'] as String?;
+      final currentProductId = currentSubscription['productId'] as String?;
+      final currentPlatform = currentSubscription['platform'] as String? ?? 'manual';
+
       final tiers = await SubscriptionTierService().getActiveTiers();
       final playTiers = tiers
           .where((t) => t.playProductId != null && t.playProductId!.isNotEmpty)
-          .toList();
+          .toList()
+        ..sort((a, b) => a.price.compareTo(b.price));
 
       if (playTiers.isEmpty) {
         messenger?.showSnackBar(
@@ -317,10 +338,21 @@ class UpgradePromptDialog extends StatelessWidget {
         return;
       }
 
-      final SubscriptionTier targetTier = playTiers.firstWhere(
-        (t) => t.isRecommended,
-        orElse: () => playTiers.first,
-      );
+      final currentIndex = playTiers.indexWhere((t) => t.tierId == currentTierId);
+
+      final SubscriptionTier targetTier;
+      if (currentIndex == -1) {
+        // Not currently on a Play-billed tier (e.g. still on trial/free) — offer the
+        // lowest-priced paid tier as a fresh purchase.
+        targetTier = playTiers.first;
+      } else if (currentIndex == playTiers.length - 1) {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text("You're already on our highest plan.")),
+        );
+        return;
+      } else {
+        targetTier = playTiers[currentIndex + 1];
+      }
 
       if (!await PurchaseService.instance.isAvailable()) {
         messenger?.showSnackBar(
@@ -338,7 +370,25 @@ class UpgradePromptDialog extends StatelessWidget {
         return;
       }
 
-      await PurchaseService.instance.buySubscription(response.productDetails.first);
+      final newProduct = response.productDetails.first;
+
+      // If the business already has an active Play subscription to a *different*
+      // product, this must go through Play's subscription-replace flow — a plain
+      // purchase would attempt to buy a second, parallel subscription instead of
+      // switching/prorating the existing one.
+      final hasDifferentActivePlaySubscription = currentPlatform == 'google_play' &&
+          currentProductId != null &&
+          currentProductId.isNotEmpty &&
+          currentProductId != targetTier.playProductId;
+
+      if (hasDifferentActivePlaySubscription) {
+        await PurchaseService.instance.buySubscriptionChange(
+          newProduct: newProduct,
+          currentProductId: currentProductId,
+        );
+      } else {
+        await PurchaseService.instance.buySubscription(newProduct);
+      }
     } catch (e) {
       messenger?.showSnackBar(SnackBar(content: Text('Could not start checkout: $e')));
     }

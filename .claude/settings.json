@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/ntoko/AppData/Local/Pub/Cache/hosted/pub.dev/in_app_purchase_android-0.5.1/lib/src/types/**)"
+    ]
+  }
+}

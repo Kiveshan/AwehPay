@@ -205,6 +205,10 @@ class _BusinessListTile extends StatelessWidget {
         statusColor = Colors.red;
         statusText = 'Cancelled';
         break;
+      case 'cancel_at_period_end':
+        statusColor = Colors.orange;
+        statusText = 'Cancelling';
+        break;
       case 'payment_failed':
         statusColor = Colors.red;
         statusText = 'Failed';
