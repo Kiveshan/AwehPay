@@ -21,11 +21,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    // TODO: switch to the permanent applicationId (e.g. com.awehbiz.app) once a matching
-    // Firebase Android app / google-services.json and Play Console app exist — see key.properties.example
-    // and the Google Play Billing plan for context. Left as the placeholder for now so local
-    // builds keep matching the existing google-services.json registration.
-    namespace = "com.example.awe_pay"
+    namespace = "com.awehpay.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -39,7 +35,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.awe_pay"
+        applicationId = "com.awehpay.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

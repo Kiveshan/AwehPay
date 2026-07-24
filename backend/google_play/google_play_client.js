@@ -52,7 +52,7 @@ function getAndroidPublisher() {
   return androidPublisherClient;
 }
 
-const PACKAGE_NAME = process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.awehbiz.app';
+const PACKAGE_NAME = process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.awehpay.app';
 
 // Fetches the current state of a subscription purchase directly from Google Play —
 // the source of truth for status/expiry. RTDN notifications only signal "something

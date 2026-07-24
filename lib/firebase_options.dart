@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
   // Android Firebase configuration used by the emulator or Android devices.
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyC8yLQIHAI123Tg_Z_qdD7VPhROudt2z8Y',
-    appId: '1:919993307286:android:aea5c3b7e3b8922cb832b7',
+    appId: '1:919993307286:android:d3439cc95967adf6b832b7',
     messagingSenderId: '919993307286',
     projectId: 'awehpay',
     storageBucket: 'awehpay.firebasestorage.app',
