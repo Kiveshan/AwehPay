@@ -112,9 +112,15 @@ class BusinessSubscription {
   final DateTime? startedAt;
   final DateTime? expiresAt;
   final DateTime? nextBillingDate;
+  final DateTime? trialEndDate;
   final double price;
   final String currency;
   final String billingPeriod;
+  // 'manual' (trial/admin-set, default) or 'google_play' (paid via Play Billing).
+  final String platform;
+  final String? purchaseToken;
+  final String? productId;
+  final String? basePlanId;
 
   BusinessSubscription({
     required this.tierId,
@@ -123,9 +129,14 @@ class BusinessSubscription {
     this.startedAt,
     this.expiresAt,
     this.nextBillingDate,
+    this.trialEndDate,
     required this.price,
     required this.currency,
     required this.billingPeriod,
+    this.platform = 'manual',
+    this.purchaseToken,
+    this.productId,
+    this.basePlanId,
   });
 
   factory BusinessSubscription.fromMap(Map<String, dynamic> map) {
@@ -136,9 +147,14 @@ class BusinessSubscription {
       startedAt: _parseTimestamp(map['startedAt']),
       expiresAt: _parseTimestamp(map['expiresAt']),
       nextBillingDate: _parseTimestamp(map['nextBillingDate']),
+      trialEndDate: _parseTimestamp(map['trialEndDate']),
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
       currency: map['currency'] as String? ?? 'ZAR',
       billingPeriod: map['billingPeriod'] as String? ?? '',
+      platform: map['platform'] as String? ?? 'manual',
+      purchaseToken: map['purchaseToken'] as String?,
+      productId: map['productId'] as String?,
+      basePlanId: map['basePlanId'] as String?,
     );
   }
 
@@ -150,9 +166,14 @@ class BusinessSubscription {
       'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
       'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
       'nextBillingDate': nextBillingDate != null ? Timestamp.fromDate(nextBillingDate!) : null,
+      'trialEndDate': trialEndDate != null ? Timestamp.fromDate(trialEndDate!) : null,
       'price': price,
       'currency': currency,
       'billingPeriod': billingPeriod,
+      'platform': platform,
+      'purchaseToken': purchaseToken,
+      'productId': productId,
+      'basePlanId': basePlanId,
     };
   }
 }

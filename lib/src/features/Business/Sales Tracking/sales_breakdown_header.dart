@@ -8,10 +8,10 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 54,
-          height: 54,
+          width: 80,
+          height: 80,
           child: Image.asset(
-            'assets/images/logo.png',
+            'assets/images/logo2.png',
             fit: BoxFit.contain,
           ),
         ),

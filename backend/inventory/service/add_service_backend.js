@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { checkSubscriptionLimit } = require('../../middleware/subscription_limits');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -90,6 +91,21 @@ router.post('/add-service', async (req, res) => {
     }
 
     const businessId = await getBusinessId(idToken);
+
+    // Check subscription limits for services
+    const limitCheck = await checkSubscriptionLimit(businessId, 'services');
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: limitCheck.error,
+        limitType: 'services',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        tierName: limitCheck.tierName,
+        requiresUpgrade: true
+      });
+    }
+
     const businessRef = db.collection('businesses').doc(businessId);
     const serviceRef = businessRef.collection('services').doc();
     const now = admin.firestore.FieldValue.serverTimestamp();

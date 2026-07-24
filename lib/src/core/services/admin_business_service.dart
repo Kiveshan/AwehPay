@@ -39,4 +39,8 @@ class AdminBusinessService {
         .map((data) => BankAccount.fromMap(data, data['bankAccountId'] as String? ?? ''))
         .toList();
   }
+
+  Future<void> disableBusiness(String businessId, bool disabled) async {
+    await _apiService.disableBusiness(businessId: businessId, disabled: disabled);
+  }
 }

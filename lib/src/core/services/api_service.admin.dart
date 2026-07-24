@@ -135,6 +135,27 @@ mixin _AdminApiMixin on _ApiServiceBase {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> disableBusiness({
+    required String businessId,
+    required bool disabled,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/admin/businesses/disable'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'businessId': businessId,
+        'disabled': disabled,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<List<Map<String, dynamic>>> listSubscriptionTiers() async {
     final response = await _client.get(
       _uri('/subscription-tiers/list'),
@@ -159,6 +180,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     required bool isRecommended,
     required List<String> features,
     required Map<String, dynamic> limits,
+    String? playProductId,
+    String? playBasePlanId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -184,6 +207,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
         'isRecommended': isRecommended,
         'features': features,
         'limits': limits,
+        'playProductId': playProductId,
+        'playBasePlanId': playBasePlanId,
       }),
     );
 
@@ -204,6 +229,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     bool? isRecommended,
     List<String>? features,
     Map<String, dynamic>? limits,
+    String? playProductId,
+    String? playBasePlanId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -226,6 +253,8 @@ mixin _AdminApiMixin on _ApiServiceBase {
     if (isRecommended != null) body['isRecommended'] = isRecommended;
     if (features != null) body['features'] = features;
     if (limits != null) body['limits'] = limits;
+    if (playProductId != null) body['playProductId'] = playProductId;
+    if (playBasePlanId != null) body['playBasePlanId'] = playBasePlanId;
 
     final response = await _client.put(
       _uri('/subscription-tiers/$tierId'),

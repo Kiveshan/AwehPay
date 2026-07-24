@@ -18,6 +18,9 @@ class SubscriptionTier {
   final String updatedBy;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  // Google Play Console product/base-plan id this tier maps to (null for free/manual-only tiers).
+  final String? playProductId;
+  final String? playBasePlanId;
 
   SubscriptionTier({
     required this.tierId,
@@ -37,6 +40,8 @@ class SubscriptionTier {
     required this.updatedBy,
     this.createdAt,
     this.updatedAt,
+    this.playProductId,
+    this.playBasePlanId,
   });
 
   factory SubscriptionTier.fromMap(Map<String, dynamic> map, String docId) {
@@ -60,6 +65,8 @@ class SubscriptionTier {
       updatedBy: map['updatedBy'] as String? ?? '',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      playProductId: map['playProductId'] as String?,
+      playBasePlanId: map['playBasePlanId'] as String?,
     );
   }
 
@@ -82,6 +89,8 @@ class SubscriptionTier {
       'updatedBy': updatedBy,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'playProductId': playProductId,
+      'playBasePlanId': playBasePlanId,
     };
   }
 }

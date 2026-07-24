@@ -66,6 +66,8 @@ router.post('/create', async (req, res) => {
       isRecommended,
       features,
       limits,
+      playProductId,
+      playBasePlanId,
     } = req.body;
 
     if (!name || !code) {
@@ -89,6 +91,8 @@ router.post('/create', async (req, res) => {
       isRecommended: typeof isRecommended === 'boolean' ? isRecommended : false,
       features: Array.isArray(features) ? features : [],
       limits: limits || {},
+      playProductId: playProductId || null,
+      playBasePlanId: playBasePlanId || null,
       createdBy: adminUser.uid,
       updatedBy: adminUser.uid,
       createdAt: now,
@@ -129,6 +133,8 @@ router.put('/:tierId', async (req, res) => {
       isRecommended,
       features,
       limits,
+      playProductId,
+      playBasePlanId,
     } = req.body;
 
     const tierRef = db.collection('subscriptionTiers').doc(tierId);
@@ -155,6 +161,8 @@ router.put('/:tierId', async (req, res) => {
     if (isRecommended !== undefined) updateData.isRecommended = isRecommended;
     if (features !== undefined) updateData.features = features;
     if (limits !== undefined) updateData.limits = limits;
+    if (playProductId !== undefined) updateData.playProductId = playProductId;
+    if (playBasePlanId !== undefined) updateData.playBasePlanId = playBasePlanId;
 
     await tierRef.update(updateData);
 
@@ -163,6 +171,90 @@ router.put('/:tierId', async (req, res) => {
       tierId,
       message: 'Subscription tier updated successfully',
     });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Initialize or ensure basic tier has default limits
+router.post('/initialize-basic-tier', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'idToken is required' });
+    }
+
+    const adminUser = await verifyAdmin(idToken);
+
+    const basicTierRef = db.collection('subscriptionTiers').doc('basic');
+    const basicTierDoc = await basicTierRef.get();
+
+    const defaultLimits = {
+      maxProducts: 100,
+      maxServices: 15,
+      maxCardPaymentsPerDay: 50,
+      barcodeScannerEnabled: false,
+      lowStockAlertsEnabled: false,
+      analyticsEnabled: false,
+      cashSalesEnabled: true,
+      cardPaymentsEnabled: true,
+      expenseTrackingEnabled: false,
+    };
+
+    if (basicTierDoc.exists) {
+      // Update existing basic tier with default limits if not set
+      const currentData = basicTierDoc.data();
+      const currentLimits = currentData.limits || {};
+      
+      const updateData = {
+        limits: {
+          ...currentLimits,
+          ...defaultLimits,
+        },
+        updatedBy: adminUser.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await basicTierRef.update(updateData);
+
+      res.json({
+        success: true,
+        message: 'Basic tier limits updated with defaults',
+        tierId: 'basic',
+        limits: updateData.limits,
+      });
+    } else {
+      // Create basic tier with default limits
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      await basicTierRef.set({
+        tierId: 'basic',
+        name: 'Basic',
+        code: 'basic',
+        price: 0,
+        currency: 'ZAR',
+        billingPeriod: 'free',
+        setupFee: 0,
+        description: 'Basic tier with limited features',
+        displayOrder: 1,
+        isActive: true,
+        isRecommended: false,
+        features: ['Basic inventory management', 'Cash payments'],
+        limits: defaultLimits,
+        createdBy: adminUser.uid,
+        updatedBy: adminUser.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Basic tier created with default limits',
+        tierId: 'basic',
+        limits: defaultLimits,
+      });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

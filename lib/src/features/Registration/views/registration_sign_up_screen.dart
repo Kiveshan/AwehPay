@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +8,8 @@ import 'package:awe_pay/src/features/Registration/utils/registration_validator.d
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_scaffold.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
+import 'terms_and_conditions_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class RegistrationSignUpScreen extends StatefulWidget {
   const RegistrationSignUpScreen({super.key});
@@ -28,6 +31,17 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
   String? _emailError;
   String? _passwordError;
   bool _obscurePassword = true;
+  bool _consentAccepted = false;
+  String? _consentError;
+  late final TapGestureRecognizer _termsLinkRecognizer;
+  late final TapGestureRecognizer _privacyLinkRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsLinkRecognizer = TapGestureRecognizer()..onTap = _openTerms;
+    _privacyLinkRecognizer = TapGestureRecognizer()..onTap = _openPrivacy;
+  }
 
   @override
   void dispose() {
@@ -35,7 +49,23 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
     _contactNumberController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _termsLinkRecognizer.dispose();
+    _privacyLinkRecognizer.dispose();
     super.dispose();
+  }
+
+  void _openTerms() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TermsAndConditionsScreen()),
+    );
+  }
+
+  void _openPrivacy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+    );
   }
 
   void _handleNext() {
@@ -63,8 +93,78 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
     registrationDraft.phoneNumber = phoneNumber;
     registrationDraft.email = email;
     registrationDraft.password = password;
+    registrationDraft.termsAccepted = _consentAccepted;
+    registrationDraft.privacyAccepted = _consentAccepted;
+
+    setState(() {
+      _consentError = _consentAccepted
+          ? null
+          : 'You must accept the Terms and Conditions and Privacy Policy';
+    });
+
+    if (_consentError != null) {
+      return;
+    }
 
     context.push(AppRoutes.businessInformation);
+  }
+
+  Widget _buildConsentCheckbox({
+    required bool value,
+    required String? error,
+    required ValueChanged<bool> onChanged,
+  }) {
+    const linkStyle = TextStyle(
+      decoration: TextDecoration.underline,
+      color: Color(0xFFE8A28D),
+      fontWeight: FontWeight.w600,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: (checked) => onChanged(checked ?? false),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(color: Colors.black87, fontSize: 14),
+                    children: [
+                      const TextSpan(text: 'I accept the '),
+                      TextSpan(
+                        text: 'Terms and Conditions',
+                        style: linkStyle,
+                        recognizer: _termsLinkRecognizer,
+                      ),
+                      const TextSpan(text: ' and '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: linkStyle,
+                        recognizer: _privacyLinkRecognizer,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 44, top: 4),
+            child: Text(
+              error,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -123,6 +223,17 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                   },
                 ),
                 errorText: _passwordError,
+              ),
+              const SizedBox(height: 24),
+              _buildConsentCheckbox(
+                value: _consentAccepted,
+                error: _consentError,
+                onChanged: (checked) {
+                  setState(() {
+                    _consentAccepted = checked;
+                    _consentError = null;
+                  });
+                },
               ),
               const SizedBox(height: 28),
               if (_errorMessage != null)

@@ -1,4 +1,6 @@
-import 'package:awe_pay/src/core/services/api_service.dart';
+import 'package:awe_pay/src/core/services/api_service.dart' show ApiService, SubscriptionLimitException;
+import 'package:awe_pay/src/core/services/subscription_tier_service.dart';
+import 'package:awe_pay/src/core/widgets/upgrade_prompt_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,6 +17,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   bool _isServiceAdded = false;
   bool _isSavingService = false;
   final _apiService = ApiService();
+  final _subscriptionService = SubscriptionTierService();
   final _serviceNameController = TextEditingController();
   final _durationController = TextEditingController();
   final _costPriceController = TextEditingController();
@@ -171,7 +174,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
       });
     } catch (error) {
       if (mounted) {
-        _showError(error.toString());
+        await _handleError(error);
       }
     } finally {
       if (mounted) {
@@ -196,6 +199,25 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _handleError(dynamic error) async {
+    // Check if it's a subscription limit exception from backend
+    if (error is SubscriptionLimitException) {
+      if (mounted) {
+        await UpgradePromptDialog.show(
+          context,
+          limitType: error.limitType ?? 'services',
+          limit: error.limit ?? 15,
+          current: error.current ?? 0,
+          tierName: error.tierName ?? 'Basic',
+        );
+      }
+      return;
+    }
+    
+    // Fallback to showing the error as a SnackBar
+    _showError(error.toString());
   }
 }
 
@@ -239,8 +261,8 @@ class _Header extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Image.asset('assets/images/logo.png',
-            width: 48, height: 48, fit: BoxFit.contain),
+        Image.asset('assets/images/logo2.png',
+            width: 72, height: 72, fit: BoxFit.contain),
         Text(
           title,
           style: const TextStyle(

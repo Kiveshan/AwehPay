@@ -1,8 +1,10 @@
 import 'package:awe_pay/src/core/services/api_service.dart';
+import 'package:awe_pay/src/core/services/subscription_tier_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/widgets/upgrade_prompt_dialog.dart';
 import 'widgets/product_card.dart';
 import 'widgets/product_item.dart';
 import 'widgets/product_list_widgets.dart';
@@ -19,9 +21,13 @@ class ProductListScreen extends StatefulWidget {
 class _ProductListScreenState extends State<ProductListScreen> {
   final _searchController = TextEditingController();
   final _apiService = ApiService();
+  final _subscriptionService = SubscriptionTierService();
   String _selectedCategory = '';
   List<ProductItem> _allProducts = [];
   bool _isLoading = true;
+  int? _productLimit;
+  int _currentProductCount = 0;
+  bool _isCheckingLimit = false;
 
   List<String> get _categories {
     final source = widget.lowStockOnly
@@ -63,6 +69,30 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void initState() {
     super.initState();
     _loadProducts();
+    _checkProductLimit();
+  }
+
+  Future<void> _checkProductLimit() async {
+    if (_isCheckingLimit) return;
+    
+    setState(() => _isCheckingLimit = true);
+    
+    try {
+      final businessId = await _apiService.getCurrentBusinessId();
+      if (businessId != null) {
+        final limitCheck = await _subscriptionService.checkLimit(businessId, LimitType.products);
+        if (mounted) {
+          setState(() {
+            _productLimit = limitCheck.limit;
+            _currentProductCount = limitCheck.current;
+          });
+        }
+      }
+    } catch (error) {
+      // Silently fail limit check to not block UI
+    } finally {
+      if (mounted) setState(() => _isCheckingLimit = false);
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -79,6 +109,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               .map(ProductItem.fromMap)
               .toList();
           _allProducts = items;
+          _currentProductCount = items.length;
           if (_allProducts.isNotEmpty) {
             final source = widget.lowStockOnly
                 ? items.where((p) => p.isLowStock)
@@ -90,9 +121,37 @@ class _ProductListScreenState extends State<ProductListScreen> {
         }
         _isLoading = false;
       });
+      
+      // Re-check limit after loading products
+      _checkProductLimit();
     } catch (error) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  bool get _isAtLimit => _productLimit != null && _currentProductCount >= _productLimit!;
+
+  Future<void> _handleAddProduct() async {
+    if (_isAtLimit && _productLimit != null) {
+      final tier = await _subscriptionService.getBusinessTier(
+        await _apiService.getCurrentBusinessId() ?? ''
+      );
+      if (mounted) {
+        await UpgradePromptDialog.show(
+          context,
+          limitType: 'products',
+          limit: _productLimit!,
+          current: _currentProductCount,
+          tierName: tier?.name ?? 'Basic',
+        );
+      }
+      return;
+    }
+    context.push(AppRoutes.addProduct).then((_) {
+      if (mounted) {
+        _loadProducts();
+      }
+    });
   }
 
   @override
@@ -217,14 +276,30 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Text(
-                      '${_selectedCategory.isEmpty ? 'Category' : _selectedCategory} Inventory Value:\nR${total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Color(0xFF272A2F),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        height: 1.5,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_selectedCategory.isEmpty ? 'Category' : _selectedCategory} Inventory Value:\nR${total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Color(0xFF272A2F),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            height: 1.5,
+                          ),
+                        ),
+                        if (_productLimit != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Products: $_currentProductCount/$_productLimit',
+                            style: TextStyle(
+                              color: _isAtLimit ? Colors.red : Colors.grey[600],
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   Text(
@@ -243,6 +318,44 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ),
       ),
+      floatingActionButton: _buildAddProductButton(),
+    );
+  }
+
+  Widget _buildAddProductButton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_productLimit != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isAtLimit ? Colors.red[50] : Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isAtLimit ? Colors.red[200]! : Colors.blue[200]!,
+              ),
+            ),
+            child: Text(
+              '$_currentProductCount/$_productLimit',
+              style: TextStyle(
+                color: _isAtLimit ? Colors.red[700] : Colors.blue[700],
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        FloatingActionButton(
+          onPressed: _isAtLimit ? null : _handleAddProduct,
+          backgroundColor: _isAtLimit ? Colors.grey[300] : const Color(0xFFDFA890),
+          child: Icon(
+            Icons.add,
+            color: _isAtLimit ? Colors.grey[500] : Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

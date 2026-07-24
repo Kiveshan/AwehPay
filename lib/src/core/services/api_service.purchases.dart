@@ -40,6 +40,34 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     return body['status'] as String;
   }
 
+  /// Verifies a Google Play subscription purchase server-side and, on success, grants
+  /// the matching tier. The client-local purchase state is never trusted directly —
+  /// this call is what actually updates businesses/{id}.subscription in Firestore.
+  Future<Map<String, dynamic>> verifyGooglePlayPurchase({
+    required String purchaseToken,
+    required String productId,
+    String? basePlanId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/purchases/verify-google-play'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({
+        'purchaseToken': purchaseToken,
+        'productId': productId,
+        'basePlanId': basePlanId,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<Map<String, dynamic>> createCashTransaction({
     required List<Map<String, dynamic>> items,
     required double amountSubtotal,

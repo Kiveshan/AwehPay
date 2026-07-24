@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const axios = require('axios');
+const { checkSubscriptionLimit } = require('../middleware/subscription_limits');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -27,6 +28,23 @@ router.get('/verify-payment/:reference', async (req, res) => {
       .doc(businessId)
       .collection('transactions')
       .doc(reference);
+
+    // Check subscription limits for daily card payments (only when status changes to completed)
+    const transactionDoc = await transactionRef.get();
+    if (transactionDoc.exists && transactionDoc.data()?.status === 'pending') {
+      const limitCheck = await checkSubscriptionLimit(businessId, 'cardPayments');
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: limitCheck.error,
+          limitType: 'cardPayments',
+          limit: limitCheck.limit,
+          current: limitCheck.current,
+          tierName: limitCheck.tierName,
+          requiresUpgrade: true
+        });
+      }
+    }
 
     const verifyResponse = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,

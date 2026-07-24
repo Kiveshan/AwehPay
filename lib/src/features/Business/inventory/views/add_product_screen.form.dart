@@ -8,6 +8,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
   bool _isProcessingInvoice = false;
   Timer? _successTimer;
   final _apiService = ApiService();
+  final _subscriptionService = SubscriptionTierService();
   final _invoiceScanService = InvoiceScanService();
   late final TextEditingController _productNameController;
   late final TextEditingController _categoryController;
@@ -173,7 +174,7 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
       }
     } catch (error) {
       if (mounted) {
-        _showError(error.toString());
+        await _handleError(error);
       }
     } finally {
       if (mounted) {
@@ -234,6 +235,25 @@ mixin _AddProductFormMixin on State<AddProductScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _handleError(dynamic error) async {
+    // Check if it's a subscription limit exception from backend
+    if (error is SubscriptionLimitException) {
+      if (mounted) {
+        await UpgradePromptDialog.show(
+          context,
+          limitType: error.limitType ?? 'products',
+          limit: error.limit ?? 15,
+          current: error.current ?? 0,
+          tierName: error.tierName ?? 'Basic',
+        );
+      }
+      return;
+    }
+    
+    // Fallback to showing the error as a SnackBar
+    _showError(error.toString());
   }
 
   /// After a successful add, the success screen is shown for 5 seconds and then

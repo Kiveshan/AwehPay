@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/services/api_service.dart';
+import '../../../core/services/api_service.dart' show ApiService, SubscriptionLimitException;
+import '../../../core/services/subscription_tier_service.dart';
+import '../../../core/widgets/upgrade_prompt_dialog.dart';
 import '../../system_admin/views/widgets/admin_scaffold.dart';
 import 'cash_payment_screen.dart';
 import 'qr_code_screen.dart';
@@ -35,18 +37,46 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   final List<PurchaseItem> _items = [];
   final TextEditingController _searchController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final SubscriptionTierService _subscriptionService = SubscriptionTierService();
 
   List<PurchaseItem> _catalog = [];
   List<PurchaseItem> _filteredCatalog = [];
   bool _showDropdown = false;
   bool _isLoading = true;
   String? _loadError;
+  int? _cardPaymentLimit;
+  int _currentCardPaymentCount = 0;
+  bool _isCheckingLimit = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _loadCatalog();
+    _checkCardPaymentLimit();
+  }
+
+  Future<void> _checkCardPaymentLimit() async {
+    if (_isCheckingLimit) return;
+    
+    setState(() => _isCheckingLimit = true);
+    
+    try {
+      final businessId = await _apiService.getCurrentBusinessId();
+      if (businessId != null) {
+        final limitCheck = await _subscriptionService.checkLimit(businessId, LimitType.cardPayments);
+        if (mounted) {
+          setState(() {
+            _cardPaymentLimit = limitCheck.limit;
+            _currentCardPaymentCount = limitCheck.current;
+          });
+        }
+      }
+    } catch (error) {
+      // Silently fail limit check to not block UI
+    } finally {
+      if (mounted) setState(() => _isCheckingLimit = false);
+    }
   }
 
   @override
@@ -130,6 +160,38 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     return _items.fold(0.0, (sum, item) {
       final priceValue = double.tryParse(item.price.replaceAll('R', '').replaceAll(',', '')) ?? 0.0;
       return sum + (priceValue * item.quantity);
+    });
+  }
+
+  bool get _isAtCardLimit => _cardPaymentLimit != null && _currentCardPaymentCount >= _cardPaymentLimit!;
+
+  Future<void> _handleQrPayment() async {
+    if (_isAtCardLimit && _cardPaymentLimit != null) {
+      final tier = await _subscriptionService.getBusinessTier(
+        await _apiService.getCurrentBusinessId() ?? ''
+      );
+      if (mounted) {
+        await UpgradePromptDialog.show(
+          context,
+          limitType: 'cardPayments',
+          limit: _cardPaymentLimit!,
+          current: _currentCardPaymentCount,
+          tierName: tier?.name ?? 'Basic',
+        );
+      }
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QRCodeScreen(
+          items: _items,
+          totalAmount: _totalAmount,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) {
+        _checkCardPaymentLimit();
+      }
     });
   }
 
@@ -405,15 +467,34 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             PurpleButton(
               label: 'Generate QR Code',
               icon: Icons.qr_code_2,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => QRCodeScreen(
-                    items: _items,
-                    totalAmount: _totalAmount,
-                  ),
+              onPressed: _isAtCardLimit ? null : _handleQrPayment,
+            ),
+            if (_cardPaymentLimit != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 14,
+                      color: _isAtCardLimit ? Colors.red[700] : Colors.blue[700],
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Card payments: $_currentCardPaymentCount/$_cardPaymentLimit today',
+                        style: TextStyle(
+                          color: _isAtCardLimit ? Colors.red[700] : Colors.blue[700],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             PurpleButton(
               label: 'Cash Payment',

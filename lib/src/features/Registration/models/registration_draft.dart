@@ -20,6 +20,8 @@ class RegistrationDraft {
   String branchName = '';
   String branchCode = '';
   SubscriptionTier? selectedTier;
+  bool termsAccepted = false;
+  bool privacyAccepted = false;
 }
 
 final registrationDraft = RegistrationDraft();

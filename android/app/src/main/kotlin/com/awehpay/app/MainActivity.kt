@@ -1,4 +1,4 @@
-package com.example.awe_pay
+package com.awehpay.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
