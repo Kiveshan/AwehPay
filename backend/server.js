@@ -68,6 +68,7 @@ const createCashTransaction = require('./purchases/create_cash_transaction');
 const createQrTransaction = require('./purchases/create_qr_transaction');
 const verifyPayment = require('./purchases/verify_payment');
 const verifyGooglePlayPurchase = require('./purchases/verify_google_play_purchase');
+const privacyPolicy = require('./legal/privacy_policy');
 const paystackWebhook = require('./webhooks/paystack');
 const googlePlayWebhook = require('./webhooks/google_play');
 const productListBackend = require('./inventory/product/product_list_backend');
@@ -161,6 +162,8 @@ app.get('/delete-account', (req, res) => {
 </body>
 </html>`);
 });
+
+app.use('/privacy-policy', privacyPolicy);
 
 app.post('/verify-token', async (req, res) => {
   try {
