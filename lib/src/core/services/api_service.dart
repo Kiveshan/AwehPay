@@ -32,9 +32,13 @@ class _ApiServiceBase {
 
   final http.Client _client;
 
+  // Defaults to the production backend so a release build accidentally made without
+  // --dart-define (e.g. `flutter build apk/appbundle --release` run directly) still
+  // points somewhere real, instead of silently baking in the emulator-only loopback
+  // address. Local dev explicitly overrides this via npm run dev's --dart-define flag.
   static const String baseUrl = String.fromEnvironment(
     'AWEHPAY_API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:5000',
+    defaultValue: 'https://api.awehpay.co.za',
   );
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
