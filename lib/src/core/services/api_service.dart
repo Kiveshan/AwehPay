@@ -27,6 +27,22 @@ class SubscriptionLimitException implements Exception {
   String toString() => message;
 }
 
+/// Thrown when /verify-token reports the business's subscription is blocked
+/// (expired trial, expired subscription, cancelled, or payment failed) — the
+/// login flow uses this to route to a renewal screen instead of the business home.
+class SubscriptionExpiredException implements Exception {
+  final String message;
+  final String subscriptionStatus;
+
+  SubscriptionExpiredException({
+    required this.message,
+    required this.subscriptionStatus,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class _ApiServiceBase {
   _ApiServiceBase({http.Client? client}) : _client = client ?? http.Client();
 
@@ -57,6 +73,14 @@ class _ApiServiceBase {
           limit: body['limit'] as int?,
           current: body['current'] as int?,
           tierName: body['tierName'] as String?,
+        );
+      }
+      // /verify-token's blocked-subscription responses (expired trial, expired
+      // subscription, cancelled, payment_failed) always include this field.
+      if (response.statusCode == 403 && body['subscriptionStatus'] != null) {
+        throw SubscriptionExpiredException(
+          message: body['error'] ?? 'Subscription inactive',
+          subscriptionStatus: body['subscriptionStatus'] as String,
         );
       }
       throw Exception(

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/biometric_providers.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/api_service.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
 
@@ -106,6 +107,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
         return;
       }
 
+      // Admins have no businessId and always pass this check trivially — only
+      // business owners can actually be blocked here.
+      try {
+        await ApiService().verifyCurrentUserToken();
+      } on SubscriptionExpiredException catch (error) {
+        if (!mounted) return;
+        context.go(AppRoutes.subscriptionExpired, extra: error.message);
+        return;
+      }
+
+      if (!mounted) return;
       context.go(AppRoutes.businessHome);
     } on FirebaseAuthException catch (error) {
       if (!mounted) {

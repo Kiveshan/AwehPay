@@ -5,6 +5,7 @@ import '../../core/models/subscription_tier.dart';
 import '../../features/home/views/home_screen.dart';
 import '../../features/Launch/views/launch_screen.dart';
 import '../../features/Launch/views/sign_in_screen.dart';
+import '../../features/Launch/views/subscription_expired_screen.dart';
 import '../../features/Business/views/business_home_screen.dart';
 import '../../features/Business/Business_Insights/business_insights_screen.dart';
 import '../../features/Business/Sales%20Tracking/sales_breakdown_screen.dart';
@@ -67,6 +68,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.accountCreated,
       builder: (context, state) => const AccountCreatedScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.subscriptionExpired,
+      builder: (context, state) => SubscriptionExpiredScreen(
+        message: state.extra is String ? state.extra! as String : null,
+      ),
     ),
     GoRoute(
       path: AppRoutes.adminHome,
