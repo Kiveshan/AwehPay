@@ -14,6 +14,8 @@ dotenv.config();
 function loadServiceAccount() {
   let serviceAccount;
 
+  
+
   if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
     const json = Buffer.from(
       process.env.FIREBASE_SERVICE_ACCOUNT_B64,
