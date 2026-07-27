@@ -15,6 +15,7 @@ abstract final class AppRoutes {
   static const subscriptionSelection = '/subscription-selection';
   static const paymentInformation = '/payment-information';
   static const accountCreated = '/account-created';
+  static const subscriptionExpired = '/subscription-expired';
   static const subscriptionTiers = '/admin/subscription-tiers';
   static const editSubscriptionTier = '/admin/subscription-tiers/edit';
   static const analytics = '/admin/analytics';

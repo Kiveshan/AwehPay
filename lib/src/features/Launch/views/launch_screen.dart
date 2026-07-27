@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/biometric_providers.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/api_service.dart';
 
 class LaunchScreen extends ConsumerStatefulWidget {
   const LaunchScreen({super.key});
@@ -110,13 +111,30 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
       }
 
       if (!mounted) return;
+
+      if (isAdmin) {
+        _animationController.forward().then((_) {
+          if (mounted) context.go(AppRoutes.adminHome);
+        });
+        return;
+      }
+
+      // Admins have no businessId and always pass this check trivially — only
+      // business owners can actually be blocked here.
+      String? subscriptionExpiredMessage;
+      try {
+        await ApiService().verifyCurrentUserToken();
+      } on SubscriptionExpiredException catch (error) {
+        subscriptionExpiredMessage = error.message;
+      }
+
+      if (!mounted) return;
       _animationController.forward().then((_) {
-        if (mounted) {
-          if (isAdmin) {
-            context.go(AppRoutes.adminHome);
-          } else {
-            context.go(AppRoutes.businessHome);
-          }
+        if (!mounted) return;
+        if (subscriptionExpiredMessage != null) {
+          context.go(AppRoutes.subscriptionExpired, extra: subscriptionExpiredMessage);
+        } else {
+          context.go(AppRoutes.businessHome);
         }
       });
     } catch (_) {
