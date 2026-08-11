@@ -113,7 +113,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
         await ApiService().verifyCurrentUserToken();
       } on SubscriptionExpiredException catch (error) {
         if (!mounted) return;
-        context.go(AppRoutes.subscriptionExpired, extra: error.message);
+        if (error.accountDisabled) {
+          context.go(AppRoutes.accountDisabled, extra: error.message);
+        } else {
+          context.go(AppRoutes.subscriptionExpired, extra: error.message);
+        }
         return;
       }
 

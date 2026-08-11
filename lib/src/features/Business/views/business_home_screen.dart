@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/router/app_routes.dart';
-import '../../../core/widgets/biometric_settings_button.dart';
 import '../../../core/widgets/logout_button.dart';
 import '../../../core/widgets/restore_purchases_button.dart';
 
@@ -320,7 +319,11 @@ class _BusinessHeader extends StatelessWidget {
         const SizedBox(width: 12),
         const RestorePurchasesButton(),
         const SizedBox(width: 4),
-        const BiometricSettingsButton(),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined, color: Color(0xFF272A2F)),
+          tooltip: 'Settings',
+          onPressed: () => context.push(AppRoutes.settings),
+        ),
         const SizedBox(width: 4),
         const LogoutButton(),
       ],
