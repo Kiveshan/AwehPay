@@ -2,6 +2,8 @@ const express = require('express');
 const admin = require('firebase-admin');
 const axios = require('axios');
 
+const { bankAccountFingerprint } = require('../registration/check_eligibility');
+
 const router = express.Router();
 const db = admin.firestore();
 const auth = admin.auth();
@@ -39,6 +41,27 @@ router.put('/subaccount', async (req, res) => {
 
     const businessData = businessDoc.data();
     const existingSubaccountCode = businessData.paystackSubaccountCode;
+
+    // Keep the bank-account fingerprint registry (see registration/check_eligibility.js)
+    // in sync with the new bank details, so a duplicate-account check made against this
+    // account after the edit reflects reality, and so nobody else can claim it via a
+    // fresh registration while this business is actively using it.
+    const fingerprint = bankAccountFingerprint(bankCode, accountNumber);
+    const fingerprintRef = db.collection('bankAccountFingerprints').doc(fingerprint);
+    const fingerprintDoc = await fingerprintRef.get();
+    if (fingerprintDoc.exists && fingerprintDoc.data().businessId !== businessId) {
+      return res.status(409).json({
+        error: 'This bank account is already linked to another AwehBiz account.',
+      });
+    }
+    await fingerprintRef.set({
+      businessId,
+      bankCode,
+      createdAt: fingerprintDoc.exists
+        ? fingerprintDoc.data().createdAt
+        : admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     // Paystack's create and update subaccount endpoints inconsistently name the bank
     // field: create takes `bank_code`, update takes `settlement_bank`.

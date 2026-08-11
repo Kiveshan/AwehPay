@@ -89,6 +89,7 @@ const paystackBanks = require('./payments/paystack_banks');
 const createSubaccount = require('./payments/create_subaccount');
 const updateSubaccount = require('./payments/update_subaccount');
 const accountStatus = require('./account/account_status');
+const checkEligibility = require('./registration/check_eligibility');
 
 const app = express();
 
@@ -126,6 +127,7 @@ app.use('/payments', paystackBanks);
 app.use('/payments', createSubaccount);
 app.use('/payments', updateSubaccount);
 app.use('/account', accountStatus);
+app.use('/registration', checkEligibility);
 
 const db = admin.firestore();
 const auth = admin.auth();

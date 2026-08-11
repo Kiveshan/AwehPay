@@ -158,6 +158,30 @@ class ApiService extends _ApiServiceBase
     return _decodeResponse(response);
   }
 
+  /// Pre-flight check run during sign-up, before the Firebase Auth account is
+  /// created. Pass whichever fields are known so far — `email` alone for an
+  /// early check, plus `bankCode`/`accountNumber` once those are collected —
+  /// to catch a business dodging trial expiry by re-registering under a new
+  /// email with the same settlement bank account. No auth required: this is
+  /// always called before the user has an account to sign in with.
+  Future<Map<String, dynamic>> checkRegistrationEligibility({
+    String? email,
+    String? bankCode,
+    String? accountNumber,
+  }) async {
+    final response = await _client.post(
+      _uri('/registration/check'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        if (email != null) 'email': email,
+        if (bankCode != null) 'bankCode': bankCode,
+        if (accountNumber != null) 'accountNumber': accountNumber,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<Map<String, dynamic>> saveUserProfile({
     required String uid,
     required String name,

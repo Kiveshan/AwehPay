@@ -101,17 +101,51 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
     final selectedBank =
         _banks.firstWhere((bank) => bank['code'] == _selectedBankCode);
 
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+
+    // Final eligibility gate, run right before the account is actually created:
+    // catches a duplicate email (in case it slipped through since step 1) and a
+    // bank account already claimed by another business — the trial-abuse case
+    // this whole check exists for.
+    try {
+      final eligibility = await _apiService.checkRegistrationEligibility(
+        email: registrationDraft.email,
+        bankCode: _selectedBankCode,
+        accountNumber: accountNumber,
+      );
+
+      if (eligibility['emailAvailable'] == false) {
+        setState(() {
+          _errorMessage = eligibility['emailError'] as String? ??
+              'This email is already registered';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (eligibility['bankAccountAvailable'] == false) {
+        setState(() {
+          _accountNumberError = eligibility['bankAccountError'] as String? ??
+              'This bank account is already registered to another business';
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (_) {
+      // Network hiccup on the check itself — fall through and let registration
+      // proceed; create_subaccount.js still enforces the bank-account guard
+      // server-side once the full account number reaches the backend.
+    }
+
     registrationDraft.bankName = selectedBank['name'] as String;
     registrationDraft.bankCode = _selectedBankCode!;
     registrationDraft.accountNumber = accountNumber;
     registrationDraft.accountType = accountType;
     registrationDraft.branchName = branchName;
     registrationDraft.branchCode = branchCode;
-
-    setState(() {
-      _errorMessage = null;
-      _isLoading = true;
-    });
 
     try {
       await _authService.registerBusinessOwner(registrationDraft);
