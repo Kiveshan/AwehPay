@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../app.dart';
 import '../models/subscription_tier.dart';
@@ -361,17 +362,6 @@ class UpgradePromptDialog extends StatelessWidget {
         return;
       }
 
-      final response =
-          await PurchaseService.instance.queryProducts({targetTier.playProductId!});
-      if (response.productDetails.isEmpty) {
-        messenger?.showSnackBar(
-          const SnackBar(content: Text('This plan is not available for purchase right now.')),
-        );
-        return;
-      }
-
-      final newProduct = response.productDetails.first;
-
       // If the business already has an active Play subscription to a *different*
       // product, this must go through Play's subscription-replace flow — a plain
       // purchase would attempt to buy a second, parallel subscription instead of
@@ -380,6 +370,26 @@ class UpgradePromptDialog extends StatelessWidget {
           currentProductId != null &&
           currentProductId.isNotEmpty &&
           currentProductId != targetTier.playProductId;
+
+      // The plugin only lets a subscription-change reference an "old product" that
+      // it has already fetched details for via queryProductDetails — merely knowing
+      // its ID from the restored purchase isn't enough. So when changing plans, query
+      // both the new and current product together to populate that cache.
+      final productIdsToQuery = {
+        targetTier.playProductId!,
+        if (hasDifferentActivePlaySubscription) currentProductId,
+      };
+      final response = await PurchaseService.instance.queryProducts(productIdsToQuery);
+      final newProduct = response.productDetails
+          .where((p) => p.id == targetTier.playProductId)
+          .cast<ProductDetails?>()
+          .firstWhere((p) => p != null, orElse: () => null);
+      if (newProduct == null) {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('This plan is not available for purchase right now.')),
+        );
+        return;
+      }
 
       if (hasDifferentActivePlaySubscription) {
         await PurchaseService.instance.buySubscriptionChange(

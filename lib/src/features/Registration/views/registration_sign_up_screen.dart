@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/api_service.dart';
 import 'package:awe_pay/src/features/Registration/models/registration_draft.dart';
 import 'package:awe_pay/src/features/Registration/utils/registration_validator.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
@@ -35,6 +36,7 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
   String? _consentError;
   late final TapGestureRecognizer _termsLinkRecognizer;
   late final TapGestureRecognizer _privacyLinkRecognizer;
+  bool _isCheckingEmail = false;
 
   @override
   void initState() {
@@ -68,7 +70,7 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
     );
   }
 
-  void _handleNext() {
+  Future<void> _handleNext() async {
     final fullName = _fullNameController.text.trim();
     final phoneNumber = _contactNumberController.text.trim();
     final email = _emailController.text.trim();
@@ -89,6 +91,25 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
       return;
     }
 
+    setState(() => _isCheckingEmail = true);
+    try {
+      final eligibility =
+          await ApiService().checkRegistrationEligibility(email: email);
+      if (eligibility['emailAvailable'] == false) {
+        setState(() {
+          _emailError = eligibility['emailError'] as String? ??
+              'This email is already registered';
+          _isCheckingEmail = false;
+        });
+        return;
+      }
+    } catch (_) {
+      // Network hiccup on the check itself — don't block the wizard on it.
+      // Firebase Auth still rejects a genuinely duplicate email when the
+      // account is actually created at the end of the flow.
+    }
+    setState(() => _isCheckingEmail = false);
+
     registrationDraft.fullName = fullName;
     registrationDraft.phoneNumber = phoneNumber;
     registrationDraft.email = email;
@@ -106,6 +127,7 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
       return;
     }
 
+    if (!mounted) return;
     context.push(AppRoutes.businessInformation);
   }
 
@@ -245,9 +267,9 @@ class _RegistrationSignUpScreenState extends State<RegistrationSignUpScreen> {
                   ),
                 ),
               AdminPrimaryButton(
-                label: 'Next',
+                label: _isCheckingEmail ? 'Checking...' : 'Next',
                 icon: Icons.arrow_forward,
-                onPressed: _handleNext,
+                onPressed: _isCheckingEmail ? null : _handleNext,
               ),
             ],
           ),

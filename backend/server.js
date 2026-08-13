@@ -87,6 +87,9 @@ const adminBusinessBackend = require('./admin/admin_business_backend');
 const adminAnalyticsBackend = require('./admin/analytics_backend');
 const paystackBanks = require('./payments/paystack_banks');
 const createSubaccount = require('./payments/create_subaccount');
+const updateSubaccount = require('./payments/update_subaccount');
+const accountStatus = require('./account/account_status');
+const checkEligibility = require('./registration/check_eligibility');
 
 const app = express();
 
@@ -122,6 +125,9 @@ app.use('/admin/businesses', adminBusinessBackend);
 app.use('/admin/analytics', adminAnalyticsBackend);
 app.use('/payments', paystackBanks);
 app.use('/payments', createSubaccount);
+app.use('/payments', updateSubaccount);
+app.use('/account', accountStatus);
+app.use('/registration', checkEligibility);
 
 const db = admin.firestore();
 const auth = admin.auth();
@@ -192,6 +198,18 @@ app.post('/verify-token', async (req, res) => {
         const businessData = businessDoc.data();
         const subscription = businessData.subscription || {};
         const subscriptionStatus = subscription.status || 'active';
+
+        // The owner disabled their own account from the Settings screen. Report this
+        // distinctly from a plain expired/cancelled subscription so the app can show the
+        // "your account was disabled, want to re-enable it?" prompt instead of the paywall.
+        if (businessData.selfDisabled === true) {
+          return res.status(403).json({
+            success: false,
+            error: 'This account was disabled. Sign in again to reactivate it.',
+            subscriptionStatus,
+            accountDisabled: true,
+          });
+        }
 
         // Block login for invalid subscription states
         const blockedStatuses = ['expired', 'cancelled', 'payment_failed'];

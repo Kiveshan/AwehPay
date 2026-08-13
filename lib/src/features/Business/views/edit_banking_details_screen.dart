@@ -1,33 +1,46 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_routes.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/services/auth_service.dart';
-import 'package:awe_pay/src/features/Registration/models/registration_draft.dart';
 import 'package:awe_pay/src/features/Registration/utils/registration_validator.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_scaffold.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
 
-class PaymentInformationScreen extends StatefulWidget {
-  const PaymentInformationScreen({super.key});
+/// Lets a signed-in business owner change the bank account their payouts
+/// settle to. Mirrors the registration Payment Information form, but the full
+/// account number is never stored client-side (only the last 4 digits are),
+/// so the account number field always starts blank and must be re-entered to
+/// save a change — same as at registration.
+class EditBankingDetailsScreen extends StatefulWidget {
+  const EditBankingDetailsScreen({super.key});
 
   @override
-  State<PaymentInformationScreen> createState() =>
-      _PaymentInformationScreenState();
+  State<EditBankingDetailsScreen> createState() =>
+      _EditBankingDetailsScreenState();
 }
 
-class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
-  final AuthService _authService = AuthService();
+class _EditBankingDetailsScreenState extends State<EditBankingDetailsScreen> {
   final ApiService _apiService = ApiService();
   final TextEditingController _accountNumberController =
       TextEditingController();
-  String? _selectedAccountType;
   final TextEditingController _branchNameController = TextEditingController();
   final TextEditingController _branchCodeController = TextEditingController();
-  bool _isLoading = false;
+  String? _selectedAccountType;
+  String? _selectedBankCode;
+
+  List<Map<String, dynamic>> _banks = [];
+  bool _isLoadingBanks = true;
+  String? _banksLoadError;
+
+  String? _businessId;
+  String? _bankAccountId;
+  String? _currentBankName;
+  String? _currentLast4;
+  bool _isLoadingAccount = true;
+  String? _accountLoadError;
+
+  bool _isSaving = false;
   String? _errorMessage;
   String? _bankError;
   String? _accountNumberError;
@@ -35,15 +48,19 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
   String? _branchNameError;
   String? _branchCodeError;
 
-  List<Map<String, dynamic>> _banks = [];
-  bool _isLoadingBanks = true;
-  String? _banksLoadError;
-  String? _selectedBankCode;
-
   @override
   void initState() {
     super.initState();
     _loadBanks();
+    _loadCurrentAccount();
+  }
+
+  @override
+  void dispose() {
+    _accountNumberController.dispose();
+    _branchNameController.dispose();
+    _branchCodeController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadBanks() async {
@@ -58,7 +75,7 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
         _banks = banks;
         _isLoadingBanks = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _banksLoadError = 'Failed to load banks';
         _isLoadingBanks = false;
@@ -66,15 +83,65 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _accountNumberController.dispose();
-    _branchNameController.dispose();
-    _branchCodeController.dispose();
-    super.dispose();
+  Future<void> _loadCurrentAccount() async {
+    setState(() {
+      _isLoadingAccount = true;
+      _accountLoadError = null;
+    });
+
+    try {
+      final businessId = await _apiService.getCurrentBusinessId();
+      if (businessId == null) {
+        setState(() {
+          _accountLoadError = 'No business found for this account';
+          _isLoadingAccount = false;
+        });
+        return;
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(businessId)
+          .collection('bankAccounts')
+          .where('isPrimary', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (!mounted) return;
+
+      _businessId = businessId;
+
+      if (snapshot.docs.isEmpty) {
+        setState(() {
+          _accountLoadError = 'No bank account found for this business';
+          _isLoadingAccount = false;
+        });
+        return;
+      }
+
+      final doc = snapshot.docs.first;
+      final data = doc.data();
+
+      setState(() {
+        _bankAccountId = doc.id;
+        _currentBankName = data['bankName'] as String?;
+        _currentLast4 = data['accountNumberLast4'] as String?;
+        _selectedBankCode = data['bankCode'] as String?;
+        _selectedAccountType = data['accountType'] as String?;
+        _branchNameController.text = data['branchName'] as String? ?? '';
+        _branchCodeController.text = data['branchCode'] as String? ?? '';
+        _isLoadingAccount = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _accountLoadError = 'Failed to load your current banking details';
+        _isLoadingAccount = false;
+      });
+    }
   }
 
-  Future<void> _handleComplete() async {
+  Future<void> _handleSave() async {
     final accountNumber = _accountNumberController.text.trim();
     final accountType = _selectedAccountType ?? '';
     final branchName = _branchNameController.text.trim();
@@ -84,7 +151,8 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
       _bankError = RegistrationValidator.bankSelected(_selectedBankCode);
       _accountNumberError =
           RegistrationValidator.accountNumber(accountNumber);
-      _accountTypeError = accountType.isEmpty ? 'Please select an account type' : null;
+      _accountTypeError =
+          accountType.isEmpty ? 'Please select an account type' : null;
       _branchNameError = RegistrationValidator.branchName(branchName);
       _branchCodeError = RegistrationValidator.branchCode(branchCode);
       _errorMessage = null;
@@ -98,92 +166,57 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
       return;
     }
 
+    final businessId = _businessId;
+    final bankAccountId = _bankAccountId;
+    if (businessId == null || bankAccountId == null) {
+      setState(() => _errorMessage = 'No bank account found for this business');
+      return;
+    }
+
     final selectedBank =
         _banks.firstWhere((bank) => bank['code'] == _selectedBankCode);
 
     setState(() {
       _errorMessage = null;
-      _isLoading = true;
+      _isSaving = true;
     });
 
-    // Final eligibility gate, run right before the account is actually created:
-    // catches a duplicate email (in case it slipped through since step 1) and a
-    // bank account already claimed by another business — the trial-abuse case
-    // this whole check exists for.
     try {
-      final eligibility = await _apiService.checkRegistrationEligibility(
-        email: registrationDraft.email,
-        bankCode: _selectedBankCode,
+      await _apiService.updateBankingDetails(
+        businessId: businessId,
+        bankAccountId: bankAccountId,
+        bankName: selectedBank['name'] as String,
+        bankCode: _selectedBankCode!,
         accountNumber: accountNumber,
+        accountType: accountType,
+        branchName: branchName,
+        branchCode: branchCode,
       );
 
-      if (eligibility['emailAvailable'] == false) {
-        setState(() {
-          _errorMessage = eligibility['emailError'] as String? ??
-              'This email is already registered';
-          _isLoading = false;
-        });
-        return;
-      }
+      if (!mounted) return;
 
-      if (eligibility['bankAccountAvailable'] == false) {
-        setState(() {
-          _accountNumberError = eligibility['bankAccountError'] as String? ??
-              'This bank account is already registered to another business';
-          _isLoading = false;
-        });
-        return;
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Banking details updated')),
+      );
+      Navigator.of(context).pop();
     } catch (_) {
-      // Network hiccup on the check itself — fall through and let registration
-      // proceed; create_subaccount.js still enforces the bank-account guard
-      // server-side once the full account number reaches the backend.
-    }
-
-    registrationDraft.bankName = selectedBank['name'] as String;
-    registrationDraft.bankCode = _selectedBankCode!;
-    registrationDraft.accountNumber = accountNumber;
-    registrationDraft.accountType = accountType;
-    registrationDraft.branchName = branchName;
-    registrationDraft.branchCode = branchCode;
-
-    try {
-      await _authService.registerBusinessOwner(registrationDraft);
-
-      if (!mounted) {
-        return;
-      }
-
-      context.go(AppRoutes.accountCreated);
-    } on FirebaseAuthException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
-        _errorMessage = error.message ?? 'Unable to create account';
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _errorMessage = 'Unable to create account';
+        _errorMessage = 'Unable to update banking details. Please try again.';
       });
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isSaving = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = _isLoadingBanks || _isLoadingAccount;
+
     return AdminScaffold(
-      title: 'Payment Information',
+      title: 'Banking Details',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
@@ -191,6 +224,38 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_currentBankName != null && _currentLast4 != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.account_balance_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Currently linked: $_currentBankName •••• $_currentLast4',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6C7078),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_accountLoadError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _accountLoadError!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
               const Text(
                 'Bank',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -250,7 +315,7 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
               const SizedBox(height: 18),
               AdminTextField(
                 label: 'Account Number',
-                hintText: 'Enter your account number',
+                hintText: 'Enter your new account number',
                 controller: _accountNumberController,
                 keyboardType: TextInputType.number,
                 suffixIcon: const Icon(Icons.numbers_outlined, size: 18),
@@ -275,9 +340,15 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
                   DropdownMenuItem(value: 'Savings', child: Text('Savings')),
                   DropdownMenuItem(value: 'Current', child: Text('Current')),
                   DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
-                  DropdownMenuItem(value: 'Transmission', child: Text('Transmission')),
+                  DropdownMenuItem(
+                    value: 'Transmission',
+                    child: Text('Transmission'),
+                  ),
                   DropdownMenuItem(value: 'Business', child: Text('Business')),
-                  DropdownMenuItem(value: 'Corporate', child: Text('Corporate')),
+                  DropdownMenuItem(
+                    value: 'Corporate',
+                    child: Text('Corporate'),
+                  ),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -313,9 +384,9 @@ class _PaymentInformationScreenState extends State<PaymentInformationScreen> {
                   ),
                 ),
               AdminPrimaryButton(
-                label: _isLoading ? 'Creating account...' : 'Complete',
-                icon: Icons.arrow_forward,
-                onPressed: _isLoading ? null : _handleComplete,
+                label: _isSaving ? 'Saving...' : 'Save Changes',
+                icon: Icons.check,
+                onPressed: (isLoading || _isSaving) ? null : _handleSave,
               ),
             ],
           ),

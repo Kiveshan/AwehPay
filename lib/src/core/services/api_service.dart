@@ -33,10 +33,12 @@ class SubscriptionLimitException implements Exception {
 class SubscriptionExpiredException implements Exception {
   final String message;
   final String subscriptionStatus;
+  final bool accountDisabled;
 
   SubscriptionExpiredException({
     required this.message,
     required this.subscriptionStatus,
+    this.accountDisabled = false,
   });
 
   @override
@@ -81,6 +83,7 @@ class _ApiServiceBase {
         throw SubscriptionExpiredException(
           message: body['error'] ?? 'Subscription inactive',
           subscriptionStatus: body['subscriptionStatus'] as String,
+          accountDisabled: body['accountDisabled'] == true,
         );
       }
       throw Exception(
@@ -113,6 +116,67 @@ class ApiService extends _ApiServiceBase
       _uri('/verify-token'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'idToken': idToken}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  /// Self-service disable, triggered from the Settings screen. Cancels the
+  /// business's trial/subscription and signs the door shut — the next
+  /// /verify-token call for this account will be blocked until the owner
+  /// chooses to re-enable it (and then pays, since the subscription stays
+  /// cancelled).
+  Future<Map<String, dynamic>> disableAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/account/disable'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  /// Clears the self-disabled flag. Access is still blocked afterward because
+  /// the subscription itself stays cancelled — this only stops /verify-token
+  /// from reporting accountDisabled, so the caller falls through to the
+  /// normal subscription paywall.
+  Future<Map<String, dynamic>> enableAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/account/enable'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    return _decodeResponse(response);
+  }
+
+  /// Pre-flight check run during sign-up, before the Firebase Auth account is
+  /// created. Pass whichever fields are known so far — `email` alone for an
+  /// early check, plus `bankCode`/`accountNumber` once those are collected —
+  /// to catch a business dodging trial expiry by re-registering under a new
+  /// email with the same settlement bank account. No auth required: this is
+  /// always called before the user has an account to sign in with.
+  Future<Map<String, dynamic>> checkRegistrationEligibility({
+    String? email,
+    String? bankCode,
+    String? accountNumber,
+  }) async {
+    final response = await _client.post(
+      _uri('/registration/check'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        if (email != null) 'email': email,
+        if (bankCode != null) 'bankCode': bankCode,
+        if (accountNumber != null) 'accountNumber': accountNumber,
+      }),
     );
 
     return _decodeResponse(response);

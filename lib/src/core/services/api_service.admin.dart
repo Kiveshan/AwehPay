@@ -326,4 +326,42 @@ mixin _AdminApiMixin on _ApiServiceBase {
 
     return _decodeResponse(response);
   }
+
+  /// Updates the bank account a business's payouts settle to — the same
+  /// Paystack subaccount created during registration, pointed at new bank
+  /// details instead of a fresh one, plus the mirrored Firestore doc.
+  Future<Map<String, dynamic>> updateBankingDetails({
+    required String businessId,
+    required String bankAccountId,
+    required String bankName,
+    required String bankCode,
+    required String accountNumber,
+    required String accountType,
+    required String branchName,
+    required String branchCode,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.put(
+      _uri('/payments/subaccount'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({
+        'businessId': businessId,
+        'bankAccountId': bankAccountId,
+        'bankName': bankName,
+        'bankCode': bankCode,
+        'accountNumber': accountNumber,
+        'accountType': accountType,
+        'branchName': branchName,
+        'branchCode': branchCode,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
 }
