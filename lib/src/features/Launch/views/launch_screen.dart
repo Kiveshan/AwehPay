@@ -121,20 +121,22 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
 
       // Admins have no businessId and always pass this check trivially — only
       // business owners can actually be blocked here.
-      String? subscriptionExpiredMessage;
+      SubscriptionExpiredException? blockedException;
       try {
         await ApiService().verifyCurrentUserToken();
       } on SubscriptionExpiredException catch (error) {
-        subscriptionExpiredMessage = error.message;
+        blockedException = error;
       }
 
       if (!mounted) return;
       _animationController.forward().then((_) {
         if (!mounted) return;
-        if (subscriptionExpiredMessage != null) {
-          context.go(AppRoutes.subscriptionExpired, extra: subscriptionExpiredMessage);
-        } else {
+        if (blockedException == null) {
           context.go(AppRoutes.businessHome);
+        } else if (blockedException.accountDisabled) {
+          context.go(AppRoutes.accountDisabled, extra: blockedException.message);
+        } else {
+          context.go(AppRoutes.subscriptionExpired, extra: blockedException.message);
         }
       });
     } catch (_) {
