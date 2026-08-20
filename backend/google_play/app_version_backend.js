@@ -10,6 +10,9 @@ async function getAppVersion(req, res) {
     const clientVersionCode = parseInt(req.headers['x-app-version-code'] || '0');
     const clientVersion = req.headers['x-app-version'] || '1.0.0';
     
+    console.log('Client version:', clientVersion);
+    console.log('Client version code:', clientVersionCode);
+    
     // Minimum version that supports update check (version 14 / 1.0.1)
     const MIN_UPDATE_CHECK_VERSION = 14;
     
