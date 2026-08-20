@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 part 'api_service.inventory.dart';
 part 'api_service.purchases.dart';
@@ -49,6 +50,33 @@ class _ApiServiceBase {
   _ApiServiceBase({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
+  
+  // Cache app version info to avoid repeated package_info calls
+  static String? _cachedAppVersion;
+  static String? _cachedAppVersionCode;
+  
+  Future<void> _initializeAppVersion() async {
+    if (_cachedAppVersion == null) {
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        _cachedAppVersion = packageInfo.version;
+        _cachedAppVersionCode = packageInfo.buildNumber;
+      } catch (e) {
+        // Fallback if package_info fails
+        _cachedAppVersion = '1.0.0';
+        _cachedAppVersionCode = '1';
+      }
+    }
+  }
+  
+  Future<Map<String, String>> _getHeaders() async {
+    await _initializeAppVersion();
+    return {
+      'Content-Type': 'application/json',
+      'X-App-Version': _cachedAppVersion ?? '1.0.0',
+      'X-App-Version-Code': _cachedAppVersionCode ?? '1',
+    };
+  }
 
   // Defaults to the production backend so a release build accidentally made without
   // --dart-define (e.g. `flutter build apk/appbundle --release` run directly) still
@@ -112,9 +140,10 @@ class ApiService extends _ApiServiceBase
     }
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
     final response = await _client.post(
       _uri('/verify-token'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({'idToken': idToken}),
     );
 
@@ -131,9 +160,10 @@ class ApiService extends _ApiServiceBase
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
     final response = await _client.post(
       _uri('/account/disable'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({'idToken': idToken}),
     );
 
@@ -149,9 +179,10 @@ class ApiService extends _ApiServiceBase
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
     final response = await _client.post(
       _uri('/account/enable'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({'idToken': idToken}),
     );
 
@@ -169,9 +200,10 @@ class ApiService extends _ApiServiceBase
     String? bankCode,
     String? accountNumber,
   }) async {
+    final headers = await _getHeaders();
     final response = await _client.post(
       _uri('/registration/check'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         if (email != null) 'email': email,
         if (bankCode != null) 'bankCode': bankCode,
@@ -187,9 +219,10 @@ class ApiService extends _ApiServiceBase
     required String name,
     required String email,
   }) async {
+    final headers = await _getHeaders();
     final response = await _client.post(
       _uri('/test-user-profile'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'uid': uid,
         'name': name,
