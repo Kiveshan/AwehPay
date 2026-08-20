@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/biometric_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/version_service.dart';
 
 class LaunchScreen extends ConsumerStatefulWidget {
   const LaunchScreen({super.key});
@@ -42,11 +43,31 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
       ),
     );
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        _attemptBiometricSignIn();
+    // Check for app updates first, then proceed to biometric sign-in if no update needed
+    _checkForUpdates().then((updateRequired) {
+      if (!updateRequired && mounted) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _attemptBiometricSignIn();
+          }
+        });
       }
     });
+  }
+
+  Future<bool> _checkForUpdates() async {
+    try {
+      await VersionService().checkForUpdates();
+      return false; // No update required
+    } on AppUpdateRequiredException catch (error) {
+      if (!mounted) return true;
+      _animationController.forward().then((_) {
+        if (mounted) {
+          context.go(AppRoutes.appUpdate, extra: error.message);
+        }
+      });
+      return true; // Update required
+    }
   }
 
   Future<void> _attemptBiometricSignIn() async {

@@ -1,7 +1,7 @@
 name: awe_pay
 description: A Flutter starter application for AwePay.
 publish_to: 'none'
-version: 1.0.0+12
+version: 1.0.1+14
 
 environment:
   sdk: ^3.5.0
