@@ -7,6 +7,7 @@ import '../../features/Launch/views/launch_screen.dart';
 import '../../features/Launch/views/sign_in_screen.dart';
 import '../../features/Launch/views/subscription_expired_screen.dart';
 import '../../features/Launch/views/account_disabled_screen.dart';
+import '../../features/Launch/views/app_update_screen.dart';
 import '../../features/Business/views/business_home_screen.dart';
 import '../../features/Business/views/settings_screen.dart';
 import '../../features/Business/views/edit_banking_details_screen.dart';
@@ -81,6 +82,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.accountDisabled,
       builder: (context, state) => AccountDisabledScreen(
+        message: state.extra is String ? state.extra! as String : null,
+      ),
+    ),
+    GoRoute(
+      path: AppRoutes.appUpdate,
+      builder: (context, state) => AppUpdateScreen(
         message: state.extra is String ? state.extra! as String : null,
       ),
     ),

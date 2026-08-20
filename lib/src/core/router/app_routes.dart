@@ -17,6 +17,7 @@ abstract final class AppRoutes {
   static const accountCreated = '/account-created';
   static const subscriptionExpired = '/subscription-expired';
   static const accountDisabled = '/account-disabled';
+  static const appUpdate = '/app-update';
   static const settings = '/business/settings';
   static const editBankingDetails = '/business/settings/banking';
   static const subscriptionTiers = '/admin/subscription-tiers';
