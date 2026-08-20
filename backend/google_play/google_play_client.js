@@ -82,6 +82,7 @@ async function acknowledgeSubscriptionPurchase(
 
 module.exports = {
   PACKAGE_NAME,
+  getAndroidPublisher,
   getSubscriptionPurchase,
   acknowledgeSubscriptionPurchase,
 };

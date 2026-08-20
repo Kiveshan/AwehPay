@@ -51,7 +51,7 @@ class VersionService {
     }
 
     final latestVersionData = data['latestVersion'] as Map<String, dynamic>;
-    final latestVersionCode = latestVersionData['versionCode'] as int;
+    final latestVersionCode = int.tryParse(latestVersionData['versionCode'].toString()) ?? 0;
     final latestVersionName = latestVersionData['versionName'] as String;
     final isMandatory = latestVersionData['isMandatory'] as bool? ?? false;
 
