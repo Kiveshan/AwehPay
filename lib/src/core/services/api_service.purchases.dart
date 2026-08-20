@@ -10,12 +10,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/purchases/qr-transaction'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $idToken',
-      },
+      headers: headers,
       body: jsonEncode({
         'items': items,
         'amountTotal': amountTotal,
@@ -31,9 +31,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.get(
       _uri('/purchases/verify-payment/$reference'),
-      headers: {'Authorization': 'Bearer $idToken'},
+      headers: headers,
     );
 
     final body = _decodeResponse(response);
@@ -52,12 +55,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/purchases/verify-google-play'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $idToken',
-      },
+      headers: headers,
       body: jsonEncode({
         'purchaseToken': purchaseToken,
         'productId': productId,
@@ -82,12 +85,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     }
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/purchases/cash-transaction'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $idToken',
-      },
+      headers: headers,
       body: jsonEncode({
         'items': items,
         'amountSubtotal': amountSubtotal,
@@ -108,9 +111,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     }
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.get(
       _uri('/purchases/catalog'),
-      headers: {'Authorization': 'Bearer $idToken'},
+      headers: headers,
     );
 
     final body = _decodeResponse(response);
@@ -133,9 +139,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/business/sales/record-sale'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'idToken': idToken,
         'items': items,
@@ -159,9 +168,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/business/sales/daily-summary'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'idToken': idToken,
         'date': date,
@@ -176,9 +188,12 @@ mixin _PurchasesApiMixin on _ApiServiceBase {
     if (user == null) throw Exception('No Firebase user is signed in');
 
     final idToken = await user.getIdToken();
+    final headers = await _getHeaders();
+    headers['Authorization'] = 'Bearer $idToken';
+    
     final response = await _client.post(
       _uri('/business/sales/transactions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'idToken': idToken,
         'date': date,

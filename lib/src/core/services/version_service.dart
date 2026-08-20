@@ -1,6 +1,7 @@
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 class AppUpdateRequiredException implements Exception {
   final String message;
@@ -34,8 +35,17 @@ class VersionService {
     final currentVersion = packageInfo.version;
     final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
+    // Send app version headers for backend compatibility check
+    final headers = {
+      'X-App-Version': currentVersion,
+      'X-App-Version-Code': currentBuildNumber.toString(),
+    };
+
     // Fetch latest version from backend
-    final response = await _client.get(Uri.parse('$baseUrl/app-version'));
+    final response = await _client.get(
+      Uri.parse('$baseUrl/app-version'),
+      headers: headers,
+    );
 
     if (response.statusCode != 200) {
       // If we can't check for updates, allow the user to proceed
@@ -47,6 +57,12 @@ class VersionService {
     
     if (data['success'] != true) {
       // If backend returns error, allow user to proceed
+      return;
+    }
+
+    // Check if backend indicates this version is too old for update check
+    if (data['skipUpdateCheck'] == true) {
+      // Backend determined this version should skip update check
       return;
     }
 
