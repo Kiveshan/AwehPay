@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/biometric_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/services/version_service.dart';
 import '../../system_admin/views/widgets/admin_primary_button.dart';
 import '../../system_admin/views/widgets/admin_text_field.dart';
 
@@ -68,17 +67,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
     });
 
     try {
-      // Check for app updates before allowing login
-      try {
-        await VersionService().checkForUpdates();
-      } on AppUpdateRequiredException catch (error) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-        });
-        context.go(AppRoutes.appUpdate, extra: error.message);
-        return;
-      }
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -135,13 +123,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
 
       if (!mounted) return;
       context.go(AppRoutes.businessHome);
-    } on AppUpdateRequiredException catch (error) {
-      // This is already handled above, but just in case
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.message;
-      });
     } on FirebaseAuthException catch (error) {
       if (!mounted) {
         return;
