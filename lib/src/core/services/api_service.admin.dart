@@ -156,6 +156,28 @@ mixin _AdminApiMixin on _ApiServiceBase {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> extendBusinessTrial({
+    required String businessId,
+    required int days,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No Firebase user is signed in');
+
+    final idToken = await user.getIdToken();
+    final response = await _client.post(
+      _uri('/admin/businesses/subscription/override'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'businessId': businessId,
+        'subscriptionStatus': 'active',
+        'extendTrialDays': days,
+      }),
+    );
+
+    return _decodeResponse(response);
+  }
+
   Future<List<Map<String, dynamic>>> listSubscriptionTiers() async {
     final response = await _client.get(
       _uri('/subscription-tiers/list'),

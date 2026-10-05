@@ -43,4 +43,10 @@ class AdminBusinessService {
   Future<void> disableBusiness(String businessId, bool disabled) async {
     await _apiService.disableBusiness(businessId: businessId, disabled: disabled);
   }
+
+  /// Extends the business's free trial by [days] (from today if the trial has
+  /// already ended) and reactivates its subscription.
+  Future<void> extendTrial(String businessId, int days) async {
+    await _apiService.extendBusinessTrial(businessId: businessId, days: days);
+  }
 }

@@ -21,6 +21,7 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
   final _service = AdminBusinessService();
   bool _isLoading = true;
   bool _isDisabling = false;
+  bool _isExtendingTrial = false;
   Business? _currentBusiness;
 
   final _fullNameController = TextEditingController();
@@ -126,6 +127,77 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
     });
   }
 
+  Future<int?> _askTrialDays() {
+    final controller = TextEditingController(text: '30');
+    return showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Extend trial'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The trial is extended from its current end date, or from today '
+              'if it has already ended. The subscription is reactivated.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Days to add'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final days = int.tryParse(controller.text.trim());
+              if (days == null || days <= 0 || days > 365) return;
+              Navigator.of(dialogContext).pop(days);
+            },
+            child: const Text('Extend'),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  Future<void> _extendTrial() async {
+    final business = _currentBusiness;
+    if (business == null) return;
+
+    final days = await _askTrialDays();
+    if (days == null || !mounted) return;
+
+    setState(() => _isExtendingTrial = true);
+    try {
+      await _service.extendTrial(business.businessId, days);
+      final refreshed = await _service.getBusinessById(business.businessId);
+      if (!mounted) return;
+      setState(() {
+        if (refreshed != null) _currentBusiness = refreshed;
+        _isExtendingTrial = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Trial extended by $days days')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isExtendingTrial = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to extend trial: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final business = widget.business;
@@ -175,6 +247,21 @@ class _BusinessDetailsScreenState extends State<BusinessDetailsScreen> {
                 const _SectionTitle('Subscription Status'),
                 const SizedBox(height: 8),
                 _buildSubscriptionStatus(currentBusiness),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading || _isExtendingTrial ? null : _extendTrial,
+                    icon: _isExtendingTrial
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.more_time_rounded, size: 18),
+                    label: const Text('Extend trial'),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 const _SectionTitle('Personal Details'),
                 const SizedBox(height: 16),
