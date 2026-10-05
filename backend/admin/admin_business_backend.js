@@ -217,6 +217,10 @@ router.post('/subscription/override', async (req, res) => {
       return res.status(400).json({ error: `Invalid subscriptionStatus. Must be one of: ${validStatuses.join(', ')}` });
     }
 
+    if (extendTrialDays !== undefined && (!Number.isInteger(extendTrialDays) || extendTrialDays <= 0 || extendTrialDays > 365)) {
+      return res.status(400).json({ error: 'extendTrialDays must be a whole number between 1 and 365' });
+    }
+
     const adminUser = await verifyAdmin(idToken);
 
     const doc = await db.collection('businesses').doc(businessId).get();
@@ -237,23 +241,25 @@ router.post('/subscription/override', async (req, res) => {
       updateData.status = 'disabled';
     }
 
-    // Extend trial if requested
+    // Extend trial if requested. Count from the current trial end while it's still running,
+    // but from now once it has lapsed — otherwise an expired trial gets fewer days than asked.
+    let newTrialEnd = null;
     if (extendTrialDays && subscriptionStatus === 'active') {
       const subscription = doc.data().subscription || {};
-      const currentTrialEnd = subscription.trialEndDate;
-      const newTrialEnd = currentTrialEnd 
-        ? currentTrialEnd.toDate() 
-        : new Date();
+      const currentTrialEnd = subscription.trialEndDate ? subscription.trialEndDate.toDate() : null;
+      const now = new Date();
+      newTrialEnd = currentTrialEnd && currentTrialEnd > now ? currentTrialEnd : now;
       newTrialEnd.setDate(newTrialEnd.getDate() + extendTrialDays);
       updateData['subscription.trialEndDate'] = admin.firestore.Timestamp.fromDate(newTrialEnd);
     }
 
     await db.collection('businesses').doc(businessId).update(updateData);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `Subscription status updated to ${subscriptionStatus}`,
-      subscriptionStatus 
+      subscriptionStatus,
+      trialEndDate: newTrialEnd ? newTrialEnd.toISOString() : null,
     });
   } catch (error) {
     if (error.message === 'Forbidden: admin access required') {
